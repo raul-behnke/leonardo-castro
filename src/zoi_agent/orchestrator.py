@@ -17,6 +17,7 @@ import asyncio
 import random
 from typing import Any
 
+from zoi_agent.agent.question_planner import plan_next_question, push_asked_field
 from zoi_agent.agent.responder import run_responder
 from zoi_agent.agent.schemas import SessionState
 from zoi_agent.agent.templates import build_vehicle_blocks, build_vehicle_blocks_with_ids
@@ -328,11 +329,27 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
 
     new_state = merge_into_state(state, update)
 
+    # Planner determinístico: decide próxima pergunta APÓS o merge. Substitui
+    # a decisão dispersa entre update.missing / update.next_action / responder.
+    next_q = plan_next_question(state=new_state, update=update, history=history)
+    log.info(
+        "next_question_planned",
+        field=next_q.field,
+        intent=next_q.intent,
+        skip=next_q.skip_funnel_reason,
+    )
+
     tools = await _dispatch_tools(
         update_intent_sec=update.intent_secundario,
         last_message=last_message,
         state=new_state,
     )
+    tools["next_question"] = {
+        "field": next_q.field,
+        "intent": next_q.intent,
+        "canonical_text": next_q.canonical_text,
+        "skip_funnel_reason": next_q.skip_funnel_reason,
+    }
 
     # Booking: lead aceitou slot proposto -> book ANTES do responder
     if update.chosen_slot_iso:
@@ -452,6 +469,10 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
                 )
             except Exception as e:
                 log.error("terminal_dispatch_failed", err=str(e))
+
+    # Registra a pergunta enviada (rolling window pra anti-repetição).
+    if next_q.field and next_q.intent == "funil":
+        push_asked_field(new_state, next_q.field)
 
     try:
         await session_repo.save(contact_id, new_state)
