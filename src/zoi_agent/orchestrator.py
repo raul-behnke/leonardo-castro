@@ -219,7 +219,28 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
 
     history, conversation_id = await _fetch_history(contact_id)
 
-    update = await run_updater(history=history, state=state, last_message=last_message)
+    try:
+        update = await run_updater(history=history, state=state, last_message=last_message)
+    except Exception as e:
+        # C23/PLAN §13: 3-retry da tenacity já se exauriu -> handoff_erro
+        log.error("updater_failed_terminal", contact_id=contact_id, err=str(e))
+        state.stage = "fechado"
+        state.terminal_reason = "handoff_erro"
+        try:
+            await encaminhar_para_vendedor(
+                contact_id=contact_id,
+                state=state,
+                terminal_reason="handoff_erro",
+                handoff_reason=f"updater LLM falhou: {type(e).__name__}: {e}",
+            )
+        except Exception as e2:
+            log.error("terminal_dispatch_failed", err=str(e2))
+        try:
+            await session_repo.save(contact_id, state)
+        except Exception as e3:
+            log.error("state_save_failed", err=str(e3))
+        return
+
     new_state = merge_into_state(state, update)
 
     tools = await _dispatch_tools(
@@ -255,13 +276,33 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
                 update.terminal_reason = "handoff_erro"
                 update.handoff_reason = f"conflito ao bookar slot: {e}"
 
-    bubbles = await run_responder(
-        state=new_state,
-        update=update,
-        history=history,
-        last_message=last_message,
-        tool_outputs=tools,
-    )
+    try:
+        bubbles = await run_responder(
+            state=new_state,
+            update=update,
+            history=history,
+            last_message=last_message,
+            tool_outputs=tools,
+        )
+    except Exception as e:
+        # PLAN §13: responder esgotou retries -> handoff_erro
+        log.error("responder_failed_terminal", contact_id=contact_id, err=str(e))
+        new_state.stage = "fechado"
+        new_state.terminal_reason = "handoff_erro"
+        try:
+            await encaminhar_para_vendedor(
+                contact_id=contact_id,
+                state=new_state,
+                terminal_reason="handoff_erro",
+                handoff_reason=f"responder LLM falhou: {type(e).__name__}: {e}",
+            )
+        except Exception as e2:
+            log.error("terminal_dispatch_failed", err=str(e2))
+        try:
+            await session_repo.save(contact_id, new_state)
+        except Exception as e3:
+            log.error("state_save_failed", err=str(e3))
+        return
 
     # Fotos a enviar (paralelo) + bolhas
     photo_urls: list[str] = []

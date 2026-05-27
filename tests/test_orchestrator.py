@@ -160,6 +160,94 @@ async def test_terminal_handoff_dispara_tool(monkeypatch, patch_deps) -> None:
 
 
 @pytest.mark.asyncio
+async def test_c23_updater_falha_vira_handoff_erro(monkeypatch, patch_deps) -> None:
+    """PLAN §13: updater esgotando retries -> orchestrator dispara terminal handoff_erro."""
+
+    async def boom_updater(*, history, state, last_message):
+        raise RuntimeError("openai down")
+
+    handoff_calls: list[dict] = []
+
+    async def fake_handoff(*, contact_id, state, terminal_reason, handoff_reason=None, observacoes=None):
+        handoff_calls.append({"terminal_reason": terminal_reason, "handoff_reason": handoff_reason})
+        return {"tag_removed": True, "note_created": True, "workflow_added": True}
+
+    monkeypatch.setattr(orch, "run_updater", boom_updater)
+    monkeypatch.setattr(orch, "encaminhar_para_vendedor", fake_handoff)
+
+    task = await orch.process_turn("c1", "oi")
+    await task
+
+    assert len(handoff_calls) == 1
+    assert handoff_calls[0]["terminal_reason"] == "handoff_erro"
+    assert "openai down" in handoff_calls[0]["handoff_reason"]
+    saved = patch_deps["store"]["c1"]
+    assert saved.terminal_reason == "handoff_erro"
+    assert saved.stage == "fechado"
+
+
+@pytest.mark.asyncio
+async def test_responder_falha_vira_handoff_erro(monkeypatch, patch_deps) -> None:
+    async def fake_responder(*, state, update, history, last_message, tool_outputs):
+        raise RuntimeError("responder boom")
+
+    handoff_calls: list[dict] = []
+
+    async def fake_handoff(*, contact_id, state, terminal_reason, handoff_reason=None, observacoes=None):
+        handoff_calls.append({"terminal_reason": terminal_reason, "handoff_reason": handoff_reason})
+        return {"tag_removed": True, "note_created": True, "workflow_added": True}
+
+    monkeypatch.setattr(orch, "run_responder", fake_responder)
+    monkeypatch.setattr(orch, "encaminhar_para_vendedor", fake_handoff)
+
+    task = await orch.process_turn("c1", "oi")
+    await task
+
+    assert handoff_calls[0]["terminal_reason"] == "handoff_erro"
+    assert "responder boom" in handoff_calls[0]["handoff_reason"]
+
+
+@pytest.mark.asyncio
+async def test_c13_regressao_stage_apresentacao(monkeypatch, patch_deps) -> None:
+    """Lead em fechamento pede outro carro -> update.stage=apresentacao -> state regride."""
+    patch_deps["store"]["c1"] = SessionState(
+        stage="fechamento",
+        collected=Collected(
+            nome="Raul",
+            veiculo_interesse="Duster",
+            vehicle_focus_definido=True,
+            intencao="compra_direta",
+            forma_pagamento="financiado",
+            cidade="Joinville",
+            interesse_agendamento=True,
+        ),
+    )
+
+    async def updater_regredindo(*, history, state, last_message):
+        return StateUpdate(
+            stage="apresentacao",
+            collected=Collected(nome="Raul"),
+            missing=["vehicle_focus_definido"],
+            next_action="apresentar opcoes",
+            sentiment="neutro",
+            intent="apresentar",
+            intent_secundario="ver_outros_carros",
+        )
+
+    monkeypatch.setattr(orch, "run_updater", updater_regredindo)
+
+    task = await orch.process_turn("c1", "quero ver outro carro")
+    await task
+
+    saved = patch_deps["store"]["c1"]
+    assert saved.stage == "apresentacao"  # regrediu de fechamento
+    # campos preservados (não regrediram para None)
+    assert saved.collected.veiculo_interesse == "Duster"
+    assert saved.collected.cidade == "Joinville"
+    assert saved.terminal_reason is None
+
+
+@pytest.mark.asyncio
 async def test_chosen_slot_dispara_book(monkeypatch, patch_deps) -> None:
     """update.chosen_slot_iso -> book_appointment chamado e terminal_reason=qualificado_agendado."""
     book_mock = AsyncMock(return_value={"appointment": {"id": "apt-9"}})
