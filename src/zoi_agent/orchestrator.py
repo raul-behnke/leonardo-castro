@@ -42,6 +42,45 @@ log = get_logger(__name__)
 _TASKS: dict[str, asyncio.Task] = {}
 
 
+_PLURAL_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("algum desses veículos chamou a sua atenção", "esse veículo te chamou atenção"),
+    ("algum desses veículos chamou sua atenção", "esse veículo te chamou atenção"),
+    ("algum desses chamou a sua atenção", "esse te chamou atenção"),
+    ("algum desses chamou sua atenção", "esse te chamou atenção"),
+    ("algum desses chamou atenção", "esse te chamou atenção"),
+    ("qual desses chamou mais sua atenção", "esse te chamou atenção"),
+    ("qual desses chamou sua atenção", "esse te chamou atenção"),
+    ("qual desses chamou atenção", "esse te chamou atenção"),
+    ("qual desses", "esse"),
+    ("algum desses", "esse"),
+    ("quais desses", "esse"),
+    ("alguns desses", "esse"),
+    ("algum deles chamou", "esse te chamou"),
+    ("algum deles", "esse"),
+    ("desses veículos", "esse veículo"),
+    ("desses carros", "esse carro"),
+    ("desses modelos", "esse modelo"),
+)
+
+
+def _enforce_singular_question(bubble: str) -> str:
+    """Reescreve frases plurais quando só 1 veículo foi apresentado."""
+    if not bubble:
+        return bubble
+    out = bubble
+    low = out.lower()
+    for needle, repl in _PLURAL_PATTERNS:
+        if needle in low:
+            # case-insensitive replace preservando capitalização inicial
+            idx = low.find(needle)
+            replaced = out[:idx] + repl + out[idx + len(needle):]
+            if out[idx].isupper():
+                replaced = out[:idx] + repl[0].upper() + repl[1:] + out[idx + len(needle):]
+            out = replaced
+            low = out.lower()
+    return out
+
+
 def _set_task(contact_id: str, task: asyncio.Task) -> None:
     _TASKS[contact_id] = task
 
@@ -350,6 +389,13 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
     if pre_bubbles:
         bubbles = list(pre_bubbles) + list(bubbles)
         bubbles = bubbles[: settings.responder_max_bubbles + len(pre_bubbles)]
+
+    # Guard determinístico: quando vehicles_presented_count == 1, reescreve a
+    # última bolha se o LLM teimou em usar pergunta no plural ("algum desses",
+    # "qual desses", etc). Garante contrato independentemente do LLM.
+    presented = int(tools.get("vehicles_presented_count") or 0)
+    if presented == 1 and bubbles:
+        bubbles[-1] = _enforce_singular_question(bubbles[-1])
 
     # Fotos a enviar (paralelo) + bolhas
     photo_urls: list[str] = []
