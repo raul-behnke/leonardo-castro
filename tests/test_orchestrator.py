@@ -251,6 +251,16 @@ async def test_c4_dispatch_origem_quando_nao_apresentada(monkeypatch, patch_deps
             payload = await orch.buscar_veiculo_interesse_origem(state)
             if payload:
                 out["origem_matches"] = payload
+                from zoi_agent.agent.templates import build_vehicle_blocks_with_ids
+                m = payload.get("matches") or {}
+                bs, ids = build_vehicle_blocks_with_ids(
+                    exatos=m.get("exatos") or [],
+                    parecidos=[p.get("vehicle") for p in (m.get("parecidos") or []) if p.get("vehicle")],
+                )
+                if bs:
+                    out["pre_bubbles"] = bs
+                    out["rendered_vehicle_ids"] = ids
+                    out["vehicles_presented_count"] = len(ids)
         return out
 
     monkeypatch.setattr(orch, "_dispatch_tools", real_dispatch_with_origem)

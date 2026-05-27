@@ -2,9 +2,10 @@
 
 Estratégia de seleção do alvo (em ordem):
   1) Match textual da última mensagem contra modelos do estoque (substring unidecode/lower)
-  2) Vehicle focus definido no state.collected.veiculo_interesse
-  3) Último external_id em vehicles_shown
-  4) Único veículo casado quando busca por last_message retornar 1
+  2) state.last_card_external_id (card único recém-renderizado)
+  3) Vehicle focus definido no state.collected.veiculo_interesse
+  4) state.veiculo_origem.texto (match no inventory)
+  5) Último external_id em vehicles_shown
 """
 from __future__ import annotations
 
@@ -58,11 +59,11 @@ async def pick_target_vehicle(
         log.info("photo_target_keyword", external_id=v.get("external_id"))
         return v
 
-    # 2) último vehicles_shown
-    if state.vehicles_shown:
-        v = _find_by_external_id(state.vehicles_shown[-1], inventory)
+    # 2) card único recém-renderizado (sinal mais forte que vehicles_shown)
+    if state.last_card_external_id:
+        v = _find_by_external_id(state.last_card_external_id, inventory)
         if v:
-            log.info("photo_target_last_shown", external_id=v.get("external_id"))
+            log.info("photo_target_last_card", external_id=v.get("external_id"))
             return v
 
     # 3) veiculo_interesse texto livre (foco definido)
@@ -70,6 +71,20 @@ async def pick_target_vehicle(
         v = _find_by_keyword(state.collected.veiculo_interesse, inventory)
         if v:
             log.info("photo_target_focus", external_id=v.get("external_id"))
+            return v
+
+    # 4) veiculo de origem (lead chegou anchored num modelo)
+    if state.veiculo_origem and state.veiculo_origem.texto:
+        v = _find_by_keyword(state.veiculo_origem.texto, inventory)
+        if v:
+            log.info("photo_target_origem", external_id=v.get("external_id"))
+            return v
+
+    # 5) último vehicles_shown (fallback fraco)
+    if state.vehicles_shown:
+        v = _find_by_external_id(state.vehicles_shown[-1], inventory)
+        if v:
+            log.info("photo_target_last_shown", external_id=v.get("external_id"))
             return v
 
     log.info("photo_target_not_found", last_message=last_message[:60])

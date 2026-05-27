@@ -92,6 +92,7 @@ class SessionState(BaseModel):
     origem_apresentada: bool = False
     collected: Collected = Field(default_factory=Collected)
     vehicles_shown: list[str] = Field(default_factory=list)
+    last_card_external_id: str | None = None
     humano_solicitado_count: int = 0
     ai_identity_asked_count: int = 0
     last_sentiment: Sentiment = "neutro"

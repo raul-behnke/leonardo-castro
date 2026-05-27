@@ -19,7 +19,7 @@ from typing import Any
 
 from zoi_agent.agent.responder import run_responder
 from zoi_agent.agent.schemas import SessionState
-from zoi_agent.agent.templates import build_vehicle_blocks
+from zoi_agent.agent.templates import build_vehicle_blocks, build_vehicle_blocks_with_ids
 from zoi_agent.agent.updater import merge_into_state, run_updater
 from zoi_agent.config import settings
 from zoi_agent.db import sessions as session_repo
@@ -30,7 +30,7 @@ from zoi_agent.tools.calendar import book_appointment, propose_slots
 from zoi_agent.tools.faq import get_faq_raw
 from zoi_agent.tools.handoff import encaminhar_para_vendedor
 from zoi_agent.tools.inventory import search_inventory
-from zoi_agent.tools.origem import buscar_veiculo_interesse_origem, collect_external_ids
+from zoi_agent.tools.origem import buscar_veiculo_interesse_origem
 from zoi_agent.tools.photos import build_photo_payload
 from zoi_agent.tools.terminal import TERMINAL_REASONS
 
@@ -103,18 +103,25 @@ async def _dispatch_tools(
     # Pre-render templates determinísticos: prepende ao envio antes das bolhas
     # do responder. Reduz token, mantém visual consistente.
     pre_bubbles: list[str] = []
+    rendered_ids: list[str] = []
     if out.get("origem_matches"):
         m = (out["origem_matches"] or {}).get("matches") or {}
         exatos = m.get("exatos") or []
         parecidos = [p.get("vehicle") for p in (m.get("parecidos") or []) if p.get("vehicle")]
-        pre_bubbles.extend(build_vehicle_blocks(exatos=exatos, parecidos=parecidos))
+        bs, ids = build_vehicle_blocks_with_ids(exatos=exatos, parecidos=parecidos)
+        pre_bubbles.extend(bs)
+        rendered_ids.extend(ids)
     elif out.get("search_results") and not out["search_results"].get("error"):
         sr = out["search_results"]
         exatos = sr.get("exatos") or []
         parecidos = [p.get("vehicle") for p in (sr.get("parecidos") or []) if p.get("vehicle")]
-        pre_bubbles.extend(build_vehicle_blocks(exatos=exatos, parecidos=parecidos))
+        bs, ids = build_vehicle_blocks_with_ids(exatos=exatos, parecidos=parecidos)
+        pre_bubbles.extend(bs)
+        rendered_ids.extend(ids)
     if pre_bubbles:
         out["pre_bubbles"] = pre_bubbles
+        out["rendered_vehicle_ids"] = rendered_ids
+        out["vehicles_presented_count"] = len(rendered_ids)
     # Gate duplo de agendamento (PLAN §11):
     # interesse_agendamento=true AND vehicle_focus_definido=true
     quer_agendar = bool(state.collected.interesse_agendamento)
@@ -354,12 +361,21 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
         if vid and vid not in new_state.vehicles_shown:
             new_state.vehicles_shown.append(vid)
 
-    # Origem apresentada: marca gate + acumula external_ids em vehicles_shown
-    if tools.get("origem_matches"):
-        new_state.origem_apresentada = True
-        for eid in collect_external_ids(tools["origem_matches"]):
+    # vehicles_shown só recebe IDs efetivamente RENDERIZADOS em bolhas (não
+    # candidatos da busca). last_card_external_id setado só quando 1 card único.
+    rendered_ids = tools.get("rendered_vehicle_ids") or []
+    if rendered_ids:
+        for eid in rendered_ids:
             if eid not in new_state.vehicles_shown:
                 new_state.vehicles_shown.append(eid)
+        new_state.last_card_external_id = rendered_ids[0] if len(rendered_ids) == 1 else None
+    else:
+        # Turno sem render de veículo: limpa o card-único anterior.
+        new_state.last_card_external_id = None
+
+    # Origem apresentada: marca gate (independe de quantos foram renderizados)
+    if tools.get("origem_matches"):
+        new_state.origem_apresentada = True
 
     # Send phase sob shield: não pode ser cancelado por nova preempção no meio.
     await asyncio.shield(

@@ -121,19 +121,42 @@ def build_vehicle_blocks(
     exatos: list[dict[str, Any]],
     parecidos: list[dict[str, Any]] | None = None,
 ) -> list[str]:
-    """Decide qual template usar e retorna lista de bolhas prontas.
-    - 1 exato -> card rico
-    - 2+ exatos -> lista compacta
-    - 0 exatos + parecidos -> aviso + lista parecidos
-    - tudo vazio -> []
+    """Wrapper retro-compatível. Use `build_vehicle_blocks_with_ids` em código novo."""
+    blocks, _ = build_vehicle_blocks_with_ids(exatos=exatos, parecidos=parecidos)
+    return blocks
+
+
+def build_vehicle_blocks_with_ids(
+    *,
+    exatos: list[dict[str, Any]],
+    parecidos: list[dict[str, Any]] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Decide qual template usar e retorna (bolhas, external_ids renderizados).
+
+    `rendered_ids` contém APENAS ids dos veículos que viraram bolha visível ao
+    lead — não inclui candidatos descartados pelo render. Usado pelo orchestrator
+    pra popular `vehicles_shown` e `last_card_external_id` com precisão.
     """
     parecidos = parecidos or []
     blocks: list[str] = []
+    rendered_ids: list[str] = []
+
+    def _ids(items: list[dict[str, Any]], limit: int) -> list[str]:
+        out: list[str] = []
+        for v in items[:limit]:
+            eid = v.get("external_id")
+            if eid:
+                out.append(str(eid))
+        return out
+
     if len(exatos) == 1:
         blocks.append(render_vehicle_card(exatos[0]))
+        rendered_ids.extend(_ids(exatos, 1))
     elif len(exatos) >= 2:
         blocks.append(render_vehicle_list(exatos))
+        rendered_ids.extend(_ids(exatos, 3))  # lista renderiza top-3
     elif parecidos:
         blocks.append("Não achei exatamente o que você pediu, mas seguem parecidas:")
         blocks.append(render_vehicle_list(parecidos))
-    return blocks
+        rendered_ids.extend(_ids(parecidos, 3))
+    return blocks, rendered_ids
