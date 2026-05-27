@@ -121,3 +121,67 @@ def test_vehicle_focus_promovido() -> None:
     )
     new = merge_into_state(state, upd)
     assert new.collected.veiculo_interesse_confirmado is True
+
+
+def test_merge_troca_completa_deep() -> None:
+    """troca_completa preenche subcampos incrementalmente sem perder dado antigo."""
+    state = SessionState(collected=Collected(
+        possui_troca=True,
+        troca_completa=TrocaInfo(modelo="Gol", ano=2013),
+    ))
+    # Updater retorna apenas km e quitado neste turno
+    upd = StateUpdate(
+        stage="descoberta",
+        collected=Collected(
+            possui_troca=True,
+            troca_completa=TrocaInfo(km=280000, quitado=True),
+        ),
+        missing=[], next_action="x", sentiment="neutro", intent="qualificar",
+    )
+    new = merge_into_state(state, upd)
+    t = new.collected.troca_completa
+    assert t.modelo == "Gol"      # preservado
+    assert t.ano == 2013          # preservado (BUG FIX)
+    assert t.km == 280000         # novo
+    assert t.quitado is True      # novo
+
+
+def test_merge_veiculo_interesse_override() -> None:
+    """Lead muda foco: novo veiculo_interesse substitui o antigo."""
+    state = SessionState(collected=Collected(veiculo_interesse="Chevrolet Montana"))
+    upd = StateUpdate(
+        stage="descoberta",
+        collected=Collected(veiculo_interesse="Chevrolet S10 2008"),
+        missing=[], next_action="x", sentiment="neutro", intent="qualificar",
+    )
+    new = merge_into_state(state, upd)
+    assert new.collected.veiculo_interesse == "Chevrolet S10 2008"
+
+
+def test_merge_motivo_override() -> None:
+    state = SessionState(collected=Collected(motivo_compra_ou_troca="trabalho"))
+    upd = StateUpdate(
+        stage="descoberta",
+        collected=Collected(motivo_compra_ou_troca="quero algo mais novo"),
+        missing=[], next_action="x", sentiment="neutro", intent="qualificar",
+    )
+    new = merge_into_state(state, upd)
+    assert new.collected.motivo_compra_ou_troca == "quero algo mais novo"
+
+
+def test_merge_troca_completa_null_nao_apaga() -> None:
+    """Update com troca_completa=None NÃO apaga valores existentes."""
+    state = SessionState(collected=Collected(
+        possui_troca=True,
+        troca_completa=TrocaInfo(modelo="Gol", ano=2013, km=280000, quitado=True),
+    ))
+    upd = StateUpdate(
+        stage="descoberta",
+        collected=Collected(possui_troca=True, troca_completa=None),
+        missing=[], next_action="x", sentiment="neutro", intent="qualificar",
+    )
+    new = merge_into_state(state, upd)
+    t = new.collected.troca_completa
+    assert t is not None
+    assert t.ano == 2013
+    assert t.km == 280000

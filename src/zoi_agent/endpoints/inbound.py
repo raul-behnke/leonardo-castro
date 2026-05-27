@@ -99,6 +99,22 @@ def extract_latest_inbound(messages: list[dict]) -> dict | None:
     return inbound[-1]
 
 
+def extract_inbound_burst(messages: list[dict]) -> list[dict]:
+    """Retorna TODAS as inbounds em RAJADA desde a última outbound do agent.
+
+    Lead pode dividir uma resposta em N mensagens consecutivas. Concatenar tudo
+    desde a última outbound garante que o updater veja o conjunto completo
+    (ex: "280km" + "Ta quitadinho" + "inteiro" = uma resposta única ao agent).
+    Se nunca houve outbound, retorna todas as inbounds em ordem cronológica.
+    """
+    msgs = sorted(messages or [], key=lambda m: m.get("dateAdded") or "")
+    last_out_idx = -1
+    for i, m in enumerate(msgs):
+        if m.get("direction") == "outbound":
+            last_out_idx = i
+    return [m for m in msgs[last_out_idx + 1:] if m.get("direction") == "inbound"]
+
+
 def _unwrap_messages(payload: dict) -> list[dict]:
     block = payload.get("messages")
     if isinstance(block, dict):
@@ -166,13 +182,14 @@ async def inbound(request: Request) -> dict:
         return {"status": "error", "reason": "ghl messages failed"}
 
     messages = _unwrap_messages(msgs_resp)
-    latest = extract_latest_inbound(messages)
-    if not latest:
+    burst = extract_inbound_burst(messages)
+    if not burst:
         log.info("webhook_no_inbound", contact_id=contact_id)
         return {"status": "ignored", "reason": "no inbound message"}
+    latest = burst[-1]
 
-    # Confirma que esse inbound é o realmente mais recente da conversa (não há
-    # outbound posterior). Evita re-processar quando webhook é eco antigo.
+    # Confirma que essa rajada inbound é a realmente mais recente da conversa
+    # (não há outbound posterior). Evita re-processar quando webhook é eco antigo.
     latest_any = max(messages, key=lambda m: m.get("dateAdded") or "", default=None)
     if latest_any and latest_any.get("direction") == "outbound" and (
         (latest_any.get("dateAdded") or "") > (latest.get("dateAdded") or "")
@@ -185,8 +202,20 @@ async def inbound(request: Request) -> dict:
         )
         return {"status": "ignored", "reason": "inbound superseded by outbound"}
 
-    body = strip_received_on(latest.get("body"))
-    attachments = latest.get("attachments") or []
+    # Agrega a rajada inteira (texto + attachments) — lead pode dividir resposta
+    # em várias msgs consecutivas ("280km" + "Ta quitadinho" + "inteiro").
+    burst_bodies: list[str] = []
+    attachments: list[str] = []
+    for m in burst:
+        b = strip_received_on(m.get("body"))
+        if b:
+            burst_bodies.append(b)
+        for a in (m.get("attachments") or []):
+            if a not in attachments:
+                attachments.append(a)
+    body = "\n".join(burst_bodies)
+    if len(burst) > 1:
+        log.info("webhook_burst_aggregated", n=len(burst), preview=body[:120])
     classes = classify_attachments(attachments)
 
     # Áudio: transcreve e concatena. PLAN: texto + áudio = áudio se texto vazio.

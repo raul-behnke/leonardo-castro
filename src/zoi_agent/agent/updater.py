@@ -215,20 +215,61 @@ async def run_updater(
 
 
 def merge_into_state(state: SessionState, update: StateUpdate) -> SessionState:
-    """Aplica deltas: stage, collected (não regride campo preenchido), counters."""
+    """Aplica deltas: stage, collected, counters.
+
+    Regras de merge por campo:
+      - troca_completa: DEEP MERGE (cada subcampo preserva valor existente se
+        update vier null; nunca substitui {modelo,ano,km,quitado} atômico).
+      - veiculo_interesse / veiculo_interesse_confirmado: permitem OVERRIDE
+        quando update traz valor non-null (lead pode mudar foco).
+      - motivo_compra_ou_troca: permite OVERRIDE (lead pode refinar/atualizar).
+      - veiculo_interesse_confirmado: True sticky (não regride sem update explícito).
+      - demais campos: só preenchem se atual está vazio (não regridem).
+    """
     new = state.model_copy(deep=True)
     new.stage = update.stage
     new.last_sentiment = update.sentiment
     new.last_intent = update.intent
 
-    # Merge collected: novo só preenche se atual está vazio
     cur: dict[str, Any] = new.collected.model_dump()
     nxt: dict[str, Any] = update.collected.model_dump()
+
+    OVERRIDE_FIELDS = {"veiculo_interesse", "motivo_compra_ou_troca"}
+
     for k, v in nxt.items():
+        if k == "troca_completa":
+            # Deep merge field-by-field. Preserva subcampos já preenchidos.
+            cur_t = cur.get(k) or {}
+            nxt_t = v or {}
+            merged: dict[str, Any] = {}
+            for tk in ("modelo", "ano", "km", "quitado"):
+                old_val = cur_t.get(tk)
+                new_val = nxt_t.get(tk)
+                if old_val not in (None, "") and new_val in (None, ""):
+                    merged[tk] = old_val
+                elif new_val not in (None, ""):
+                    merged[tk] = new_val
+                else:
+                    merged[tk] = old_val
+            cur[k] = merged if any(x is not None for x in merged.values()) else None
+            continue
+
+        if k in OVERRIDE_FIELDS:
+            # Override quando update traz valor non-null
+            if v not in (None, ""):
+                cur[k] = v
+            continue
+
+        if k == "veiculo_interesse_confirmado":
+            # Sticky True; só atualiza se update explicitamente trouxe True
+            if v is True:
+                cur[k] = True
+            continue
+
+        # Demais campos: só preenche se atual estava vazio
         if cur.get(k) in (None, "", False) and v not in (None, "", False):
             cur[k] = v
-        elif k == "veiculo_interesse_confirmado" and v is True:
-            cur[k] = True
+
     new.collected = type(new.collected)(**cur)
 
     new.humano_solicitado_count += max(0, min(1, update.humano_solicitado_count_delta))

@@ -61,6 +61,27 @@ def test_classify_attachments() -> None:
     assert c["other"] == ["https://x/doc.pdf"]
 
 
+def test_extract_inbound_burst_agrega_rajada() -> None:
+    """Lead manda 3 mensagens consecutivas; agregação retorna todas pra
+    o updater ver o conjunto."""
+    msgs = [
+        {"direction": "outbound", "dateAdded": "2026-05-27T10:00:00Z", "body": "pergunta do agent"},
+        {"direction": "inbound", "dateAdded": "2026-05-27T10:01:00Z", "body": "280km"},
+        {"direction": "inbound", "dateAdded": "2026-05-27T10:01:05Z", "body": "Ta quitadinho"},
+        {"direction": "inbound", "dateAdded": "2026-05-27T10:01:07Z", "body": "inteiro"},
+    ]
+    burst = inb.extract_inbound_burst(msgs)
+    assert [m["body"] for m in burst] == ["280km", "Ta quitadinho", "inteiro"]
+
+
+def test_extract_inbound_burst_vazio_quando_outbound_e_mais_recente() -> None:
+    msgs = [
+        {"direction": "inbound", "dateAdded": "2026-05-27T10:00:00Z", "body": "msg antiga"},
+        {"direction": "outbound", "dateAdded": "2026-05-27T10:05:00Z", "body": "agent respondeu"},
+    ]
+    assert inb.extract_inbound_burst(msgs) == []
+
+
 def test_extract_latest_inbound_ordering() -> None:
     msgs = [
         {"direction": "outbound", "dateAdded": "2026-05-27T12:00:00Z", "body": "out"},
@@ -216,7 +237,9 @@ def test_inbound_superseded_por_outbound_ignora(patch_all) -> None:
     with TestClient(app) as c:
         r = c.post(f"/webhook/inbound?secret={settings.webhook_secret}", json=_payload())
     assert r.status_code == 200
-    assert r.json()["reason"] == "inbound superseded by outbound"
+    # extract_inbound_burst só agrega inbounds POSTERIORES à última outbound.
+    # Como aqui a última outbound é mais nova, a rajada fica vazia -> 200 ignorado.
+    assert r.json()["reason"] == "no inbound message"
     patch_all["process"].assert_not_awaited()
 
 
@@ -243,6 +266,31 @@ def test_no_conversation(patch_all) -> None:
         r = c.post(f"/webhook/inbound?secret={settings.webhook_secret}", json=_payload())
     assert r.status_code == 200
     assert r.json()["reason"] == "no conversation"
+
+
+def test_rajada_de_msgs_agregada(patch_all) -> None:
+    """3 msgs inbound consecutivas (sem outbound entre elas) viram 1 dispatch
+    com texto agregado. Resolve bug do 'ano esquecido'."""
+    patch_all["search"].return_value = _conv()
+    patch_all["messages"].return_value = _msgs(
+        [
+            {"direction": "outbound", "dateAdded": "2026-05-27T10:00Z", "body": "Me passa o ano e km?"},
+            {"direction": "inbound", "dateAdded": "2026-05-27T10:01Z",
+             "body": "2013\n\nReceived on 📱[Lucas]", "attachments": []},
+            {"direction": "inbound", "dateAdded": "2026-05-27T10:01:05Z",
+             "body": "280mil km\n\nReceived on 📱[Lucas]", "attachments": []},
+            {"direction": "inbound", "dateAdded": "2026-05-27T10:01:10Z",
+             "body": "Ta quitadinho\n\nReceived on 📱[Lucas]", "attachments": []},
+        ]
+    )
+    with TestClient(app) as c:
+        r = c.post(f"/webhook/inbound?secret={settings.webhook_secret}", json=_payload())
+    assert r.status_code == 200
+    args = patch_all["process"].await_args.args
+    text = args[1]
+    assert "2013" in text
+    assert "280mil km" in text
+    assert "Ta quitadinho" in text
 
 
 def test_audio_e_texto_concat(patch_all) -> None:
