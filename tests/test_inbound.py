@@ -203,13 +203,38 @@ def test_c11_multi_audio_concat(patch_all) -> None:
     assert "primeiro" in args[1] and "segundo" in args[1]
 
 
-def test_last_outbound_ignora(patch_all) -> None:
+def test_inbound_superseded_por_outbound_ignora(patch_all) -> None:
+    """Quando o último outbound é mais recente que o último inbound (eco
+    tardio do GHL), descarta sem reprocessar."""
     patch_all["search"].return_value = _conv(direction="outbound")
+    patch_all["messages"].return_value = _msgs(
+        [
+            {"direction": "inbound", "dateAdded": "2026-05-27T11:00Z", "body": "antiga"},
+            {"direction": "outbound", "dateAdded": "2026-05-27T11:05Z", "body": "resposta"},
+        ]
+    )
     with TestClient(app) as c:
         r = c.post(f"/webhook/inbound?secret={settings.webhook_secret}", json=_payload())
     assert r.status_code == 200
-    assert r.json()["reason"] == "last message outbound"
+    assert r.json()["reason"] == "inbound superseded by outbound"
     patch_all["process"].assert_not_awaited()
+
+
+def test_processa_quando_search_diz_outbound_mas_inbound_eh_mais_recente(patch_all) -> None:
+    """Cenário real do bug: search metadata desatualizado diz outbound, mas a
+    mensagem inbound do lead é a mais recente. Deve processar."""
+    patch_all["search"].return_value = _conv(direction="outbound")  # metadata stale
+    patch_all["messages"].return_value = _msgs(
+        [
+            {"direction": "outbound", "dateAdded": "2026-05-27T11:00Z", "body": "anterior"},
+            {"direction": "inbound", "dateAdded": "2026-05-27T11:10Z", "body": "Tem fotos?"},
+        ]
+    )
+    with TestClient(app) as c:
+        r = c.post(f"/webhook/inbound?secret={settings.webhook_secret}", json=_payload())
+    assert r.status_code == 200
+    patch_all["process"].assert_awaited_once()
+    assert "Tem fotos?" in patch_all["process"].await_args.args[1]
 
 
 def test_no_conversation(patch_all) -> None:

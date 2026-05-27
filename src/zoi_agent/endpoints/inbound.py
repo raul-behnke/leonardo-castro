@@ -158,10 +158,6 @@ async def inbound(request: Request) -> dict:
 
     conv = convs[0]
     conv_id = conv.get("id")
-    last_dir = conv.get("lastMessageDirection")
-    if last_dir != "inbound":
-        log.info("webhook_last_outbound", contact_id=contact_id, dir=last_dir)
-        return {"status": "ignored", "reason": "last message outbound"}
 
     try:
         msgs_resp = await ghl_conv.get_messages(conv_id)
@@ -174,6 +170,20 @@ async def inbound(request: Request) -> dict:
     if not latest:
         log.info("webhook_no_inbound", contact_id=contact_id)
         return {"status": "ignored", "reason": "no inbound message"}
+
+    # Confirma que esse inbound é o realmente mais recente da conversa (não há
+    # outbound posterior). Evita re-processar quando webhook é eco antigo.
+    latest_any = max(messages, key=lambda m: m.get("dateAdded") or "", default=None)
+    if latest_any and latest_any.get("direction") == "outbound" and (
+        (latest_any.get("dateAdded") or "") > (latest.get("dateAdded") or "")
+    ):
+        log.info(
+            "webhook_inbound_superseded_by_outbound",
+            contact_id=contact_id,
+            inbound_at=latest.get("dateAdded"),
+            outbound_at=latest_any.get("dateAdded"),
+        )
+        return {"status": "ignored", "reason": "inbound superseded by outbound"}
 
     body = strip_received_on(latest.get("body"))
     attachments = latest.get("attachments") or []
