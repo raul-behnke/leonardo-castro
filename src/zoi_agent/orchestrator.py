@@ -419,8 +419,10 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
         # Turno sem render de veículo: limpa o card-único anterior.
         new_state.last_card_external_id = None
 
-    # Origem apresentada: marca gate (independe de quantos foram renderizados)
-    if tools.get("origem_matches"):
+    # Origem apresentada: marca gate sempre que QUALQUER veículo foi renderizado.
+    # Semântica: "lead já viu catálogo nosso, não precisa apresentar origem
+    # proativamente de novo". Independe do disparo (origem_matches ou search_results).
+    if rendered_ids or tools.get("origem_matches"):
         new_state.origem_apresentada = True
 
     # Send phase sob shield: não pode ser cancelado por nova preempção no meio.
