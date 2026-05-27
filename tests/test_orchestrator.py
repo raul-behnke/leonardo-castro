@@ -134,9 +134,13 @@ async def test_terminal_handoff_dispara_tool(monkeypatch, patch_deps) -> None:
 
     handoff_calls: list[dict] = []
 
-    async def fake_handoff(*, contact_id, motivo, terminal_reason):
+    async def fake_handoff(*, contact_id, state, terminal_reason, handoff_reason=None, observacoes=None):
         handoff_calls.append(
-            {"contact_id": contact_id, "motivo": motivo, "terminal_reason": terminal_reason}
+            {
+                "contact_id": contact_id,
+                "handoff_reason": handoff_reason,
+                "terminal_reason": terminal_reason,
+            }
         )
         return {"tag_removed": True, "note_created": True, "workflow_added": True}
 
@@ -149,7 +153,7 @@ async def test_terminal_handoff_dispara_tool(monkeypatch, patch_deps) -> None:
     assert len(handoff_calls) == 1
     assert handoff_calls[0]["contact_id"] == "c1"
     assert handoff_calls[0]["terminal_reason"] == "handoff_solicitado"
-    assert "lead pediu pra parar" in handoff_calls[0]["motivo"]
+    assert "lead pediu pra parar" in (handoff_calls[0]["handoff_reason"] or "")
     # state foi gravado como fechado
     assert patch_deps["store"]["c1"].terminal_reason == "handoff_solicitado"
     assert patch_deps["store"]["c1"].stage == "fechado"
@@ -218,9 +222,8 @@ async def test_book_fail_vira_handoff_erro(monkeypatch, patch_deps) -> None:
 
 
 @pytest.mark.asyncio
-async def test_terminal_qualificado_nao_dispara_handoff_em_S11(monkeypatch, patch_deps) -> None:
-    """terminal_reason=qualificado_agendado fica pra S13; orchestrator S11 só chama
-    handoff em {handoff_solicitado, handoff_erro}."""
+async def test_terminal_qualificado_dispara_terminal_action(monkeypatch, patch_deps) -> None:
+    """S13: todos os 4 terminal_reasons (incl. qualificado_*) chamam terminal action."""
 
     async def updater_quali(*, history, state, last_message):
         return StateUpdate(
@@ -230,22 +233,22 @@ async def test_terminal_qualificado_nao_dispara_handoff_em_S11(monkeypatch, patc
             next_action="x",
             sentiment="positivo",
             intent="agendamento",
-            terminal_reason="qualificado_agendado",
+            terminal_reason="qualificado_sem_agenda",
         )
 
-    handoff_calls: list[int] = []
+    handoff_calls: list[dict] = []
 
-    async def fake_handoff(**kwargs):
-        handoff_calls.append(1)
+    async def fake_handoff(*, contact_id, state, terminal_reason, handoff_reason=None, observacoes=None):
+        handoff_calls.append({"terminal_reason": terminal_reason})
         return {"tag_removed": True, "note_created": True, "workflow_added": True}
 
     monkeypatch.setattr(orch, "run_updater", updater_quali)
     monkeypatch.setattr(orch, "encaminhar_para_vendedor", fake_handoff)
 
-    task = await orch.process_turn("c1", "marca amanha")
+    task = await orch.process_turn("c1", "não quero agendar agora")
     await task
-    assert handoff_calls == []
-    assert patch_deps["store"]["c1"].terminal_reason == "qualificado_agendado"
+    assert handoff_calls == [{"terminal_reason": "qualificado_sem_agenda"}]
+    assert patch_deps["store"]["c1"].terminal_reason == "qualificado_sem_agenda"
 
 
 @pytest.mark.asyncio

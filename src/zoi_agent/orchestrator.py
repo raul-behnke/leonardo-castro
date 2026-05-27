@@ -30,10 +30,7 @@ from zoi_agent.tools.faq import get_faq_raw
 from zoi_agent.tools.handoff import encaminhar_para_vendedor
 from zoi_agent.tools.inventory import search_inventory
 from zoi_agent.tools.photos import build_photo_payload
-
-# Estados terminais que disparam o pipeline de handoff/nota+workflow já em S11.
-# Os qualificado_* recebem template completo no S13 (terminal actions).
-_HANDOFF_REASONS = {"handoff_solicitado", "handoff_erro"}
+from zoi_agent.tools.terminal import TERMINAL_REASONS
 
 log = get_logger(__name__)
 
@@ -290,15 +287,16 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
         new_state.stage = "fechado"
         new_state.terminal_reason = update.terminal_reason
         log.info("turn_terminal", contact_id=contact_id, reason=update.terminal_reason)
-        if update.terminal_reason in _HANDOFF_REASONS:
+        if update.terminal_reason in TERMINAL_REASONS:
             try:
                 await encaminhar_para_vendedor(
                     contact_id=contact_id,
-                    motivo=update.handoff_reason or update.terminal_reason,
+                    state=new_state,
                     terminal_reason=update.terminal_reason,
+                    handoff_reason=update.handoff_reason,
                 )
             except Exception as e:
-                log.error("handoff_dispatch_failed", err=str(e))
+                log.error("terminal_dispatch_failed", err=str(e))
 
     try:
         await session_repo.save(contact_id, new_state)

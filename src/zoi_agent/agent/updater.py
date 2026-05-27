@@ -68,8 +68,11 @@ Regressão de stage é permitida (lead pode pedir ver outro carro em fechamento)
 - `ai_identity_asked_count_delta=1` apenas se ESTE turno o lead questionou identidade IA.
 
 # Terminal reasons (somente se aplicável neste turno)
-- "qualificado_agendado": appointment criado.
-- "qualificado_sem_agenda": 10 campos OK e lead recusou agendar.
+- "qualificado_agendado": appointment criado (orquestrador costuma setar; só preencha
+  se o lead acabou de aceitar slot e você está certo).
+- "qualificado_sem_agenda": OS 10 CAMPOS estão preenchidos NESTE TURNO E o lead
+  recusou agendamento (ex: "não quero agendar agora", "não tenho data certa").
+  Verifique que collected NÃO tem campos null (incl. cidade, forma_pagamento etc).
 - "handoff_solicitado": pedido humano confirmado / opt_out / irritação.
 - "handoff_erro": falha técnica (não decidir aqui — orquestrador seta).
 
