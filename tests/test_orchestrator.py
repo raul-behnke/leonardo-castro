@@ -116,6 +116,77 @@ async def test_preempcao_cancela_anterior(monkeypatch, patch_deps) -> None:
 
 
 @pytest.mark.asyncio
+async def test_terminal_handoff_dispara_tool(monkeypatch, patch_deps) -> None:
+    """update com terminal_reason=handoff_solicitado deve chamar encaminhar_para_vendedor."""
+
+    async def updater_with_handoff(*, history, state, last_message):
+        return StateUpdate(
+            stage="fechado",
+            collected=Collected(),
+            missing=[],
+            next_action="handoff",
+            sentiment="irritado",
+            intent="opt_out",
+            should_handoff=True,
+            terminal_reason="handoff_solicitado",
+            handoff_reason="lead pediu pra parar",
+        )
+
+    handoff_calls: list[dict] = []
+
+    async def fake_handoff(*, contact_id, motivo, terminal_reason):
+        handoff_calls.append(
+            {"contact_id": contact_id, "motivo": motivo, "terminal_reason": terminal_reason}
+        )
+        return {"tag_removed": True, "note_created": True, "workflow_added": True}
+
+    monkeypatch.setattr(orch, "run_updater", updater_with_handoff)
+    monkeypatch.setattr(orch, "encaminhar_para_vendedor", fake_handoff)
+
+    task = await orch.process_turn("c1", "para de me mandar mensagem")
+    await task
+
+    assert len(handoff_calls) == 1
+    assert handoff_calls[0]["contact_id"] == "c1"
+    assert handoff_calls[0]["terminal_reason"] == "handoff_solicitado"
+    assert "lead pediu pra parar" in handoff_calls[0]["motivo"]
+    # state foi gravado como fechado
+    assert patch_deps["store"]["c1"].terminal_reason == "handoff_solicitado"
+    assert patch_deps["store"]["c1"].stage == "fechado"
+
+
+@pytest.mark.asyncio
+async def test_terminal_qualificado_nao_dispara_handoff_em_S11(monkeypatch, patch_deps) -> None:
+    """terminal_reason=qualificado_agendado fica pra S13; orchestrator S11 só chama
+    handoff em {handoff_solicitado, handoff_erro}."""
+
+    async def updater_quali(*, history, state, last_message):
+        return StateUpdate(
+            stage="fechado",
+            collected=Collected(),
+            missing=[],
+            next_action="x",
+            sentiment="positivo",
+            intent="agendamento",
+            terminal_reason="qualificado_agendado",
+        )
+
+    handoff_calls: list[int] = []
+
+    async def fake_handoff(**kwargs):
+        handoff_calls.append(1)
+        return {"tag_removed": True, "note_created": True, "workflow_added": True}
+
+    monkeypatch.setattr(orch, "run_updater", updater_quali)
+    monkeypatch.setattr(orch, "encaminhar_para_vendedor", fake_handoff)
+
+    task = await orch.process_turn("c1", "marca amanha")
+    await task
+    assert handoff_calls == []
+    assert patch_deps["store"]["c1"].terminal_reason == "qualificado_agendado"
+
+
+@pytest.mark.asyncio
 async def test_terminal_state_para_de_responder(monkeypatch, patch_deps) -> None:
     patch_deps["store"]["c1"] = SessionState(
         stage="fechado", terminal_reason="handoff_solicitado"
