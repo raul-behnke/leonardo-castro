@@ -31,6 +31,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ZOI Agent — AMC Veículos", version="0.1.0", lifespan=lifespan)
 
+from zoi_agent.endpoints.greet import router as greet_router  # noqa: E402
+
+app.include_router(greet_router)
+
 
 @app.get("/health")
 async def health() -> dict:
