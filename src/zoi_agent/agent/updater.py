@@ -64,7 +64,12 @@ não só de respostas diretas. Exemplos:
   - "moro em Joinville" → cidade="Joinville"
   - "vou financiar" → forma_pagamento="financiado"
   - "queria à vista" → forma_pagamento="a_vista"
-  - "tô pensando em comprar direto" → intencao="compra_direta"
+  - "tô pensando em comprar direto" / "comprar mesmo" / "comprar sem troca"
+    / "comprar sem trocar nada" / "só comprar"
+    → intencao="compra_direta" E possui_troca=false  (não tem troca quando
+    fala "comprar" sem mencionar nada pra trocar).
+  - "vou trocar" / "quero trocar" / "tô com um carro pra trocar"
+    → intencao="troca" E possui_troca=true.
   - "quero algo mais novo" / "quero algo mais econômico" / "preciso de mais espaço"
     / "tô precisando trocar porque ficou pequeno" → motivo_compra_ou_troca=<frase do lead>
 
@@ -235,6 +240,12 @@ def merge_into_state(state: SessionState, update: StateUpdate) -> SessionState:
     nxt: dict[str, Any] = update.collected.model_dump()
 
     OVERRIDE_FIELDS = {"veiculo_interesse", "motivo_compra_ou_troca"}
+    # Campos com semântica tri-state (None / True / False são todos válidos).
+    # Pra eles, False é dado VÁLIDO — não tratar como "vazio".
+    TRISTATE_BOOL_FIELDS = {"possui_troca", "interesse_agendamento"}
+
+    def _is_empty(val: Any) -> bool:
+        return val is None or val == ""
 
     for k, v in nxt.items():
         if k == "troca_completa":
@@ -266,8 +277,15 @@ def merge_into_state(state: SessionState, update: StateUpdate) -> SessionState:
                 cur[k] = True
             continue
 
+        if k in TRISTATE_BOOL_FIELDS:
+            # False é dado VÁLIDO (lead disse explicitamente "sem troca").
+            # Só preenche se atual é None E update trouxe valor bool.
+            if cur.get(k) is None and v is not None:
+                cur[k] = v
+            continue
+
         # Demais campos: só preenche se atual estava vazio
-        if cur.get(k) in (None, "", False) and v not in (None, "", False):
+        if _is_empty(cur.get(k)) and not _is_empty(v):
             cur[k] = v
 
     new.collected = type(new.collected)(**cur)

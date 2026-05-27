@@ -169,6 +169,32 @@ def test_merge_motivo_override() -> None:
     assert new.collected.motivo_compra_ou_troca == "quero algo mais novo"
 
 
+def test_merge_possui_troca_false_propaga() -> None:
+    """possui_troca=False é dado válido (lead disse 'comprar mesmo, sem troca').
+    Merge anterior tratava False como vazio e nunca propagava."""
+    state = SessionState(collected=Collected())
+    upd = StateUpdate(
+        stage="descoberta",
+        collected=Collected(intencao="compra_direta", possui_troca=False),
+        missing=[], next_action="x", sentiment="neutro", intent="qualificar",
+    )
+    new = merge_into_state(state, upd)
+    assert new.collected.intencao == "compra_direta"
+    assert new.collected.possui_troca is False  # não None
+
+
+def test_merge_interesse_agendamento_false() -> None:
+    """interesse_agendamento=False é igualmente válido (lead recusou agendar)."""
+    state = SessionState(collected=Collected())
+    upd = StateUpdate(
+        stage="descoberta",
+        collected=Collected(interesse_agendamento=False),
+        missing=[], next_action="x", sentiment="neutro", intent="qualificar",
+    )
+    new = merge_into_state(state, upd)
+    assert new.collected.interesse_agendamento is False
+
+
 def test_merge_troca_completa_null_nao_apaga() -> None:
     """Update com troca_completa=None NÃO apaga valores existentes."""
     state = SessionState(collected=Collected(
