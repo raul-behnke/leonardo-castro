@@ -18,3 +18,5 @@ htmlcov/
 postgres_data/
 *.log
 payloads/
+.env.prod
+deploy/.env.prod
