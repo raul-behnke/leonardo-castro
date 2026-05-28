@@ -68,6 +68,41 @@ async def test_pick_por_focus(fake_inv) -> None:
 
 
 @pytest.mark.asyncio
+async def test_pick_por_ano_disambigua_modelo_repetido(monkeypatch) -> None:
+    """Lead pede 'fotos do 2014' com foco em Sentra. Deve escolher Sentra 2014,
+    NÃO Sentra 2016. Bug real do contato aUWdGGgsNnAqvaUm15YT."""
+    inv = [
+        {"external_id": "s14", "marca": "Nissan", "modelo": "Sentra",
+         "titulo": "Nissan Sentra 2014", "ano": 2014,
+         "imagens": ["http://x/a", "http://x/b"]},
+        {"external_id": "s16", "marca": "Nissan", "modelo": "Sentra",
+         "titulo": "Nissan Sentra 2016", "ano": 2016,
+         "imagens": ["http://x/c", "http://x/d"]},
+    ]
+
+    async def fake_load():
+        return inv
+
+    monkeypatch.setattr(photos_mod, "load_inventory", fake_load)
+    state = SessionState(
+        collected=Collected(
+            veiculo_interesse="Nissan Sentra",
+            veiculo_interesse_confirmado=True,
+        ),
+        vehicles_shown=["s14", "s16"],
+    )
+    v14 = await photos_mod.pick_target_vehicle(
+        last_message="Tem fotos do 2014?", state=state,
+    )
+    assert v14 is not None and v14["external_id"] == "s14"
+
+    v16 = await photos_mod.pick_target_vehicle(
+        last_message="Tem fotos do 2016?", state=state,
+    )
+    assert v16 is not None and v16["external_id"] == "s16"
+
+
+@pytest.mark.asyncio
 async def test_pick_none(fake_inv) -> None:
     v = await photos_mod.pick_target_vehicle(
         last_message="oi tudo bem", state=SessionState()

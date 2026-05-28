@@ -22,20 +22,82 @@ from zoi_agent.tools.inventory import (
 log = get_logger(__name__)
 
 
-def _find_by_keyword(last_message: str, inventory: list[dict]) -> dict | None:
+_YEAR_RE = __import__("re").compile(r"\b(19[8-9]\d|20[0-3]\d)\b")
+
+
+def _extract_year(text: str) -> int | None:
+    m = _YEAR_RE.search(text or "")
+    return int(m.group(0)) if m else None
+
+
+def _find_by_keyword(
+    last_message: str,
+    inventory: list[dict],
+    *,
+    fallback_modelo: str | None = None,
+    candidates_subset: list[dict] | None = None,
+) -> dict | None:
+    """Casa veículo na fala do lead. Considera modelo + marca + título e usa
+    ANO como discriminador. Quando lead diz só o ano ("Tem fotos do 2014?"),
+    cruza com `fallback_modelo` (foco atual) pra encontrar o veículo exato.
+    """
     text = norm(last_message)
     if not text:
         return None
-    # Prioriza match em modelo, depois marca, depois título.
+    year = _extract_year(text)
+
+    # Helper: dado modelo_normalizado, retorna o veículo do estoque que casa
+    # (com ano se informado, ou o 1º que match).
+    def _match_modelo_ano(modelo_norm: str, want_year: int | None) -> dict | None:
+        if want_year is not None:
+            for v in inventory:
+                if norm(v.get("modelo")) == modelo_norm and v.get("ano") == want_year:
+                    return v
+        # sem ano ou sem match exato: primeiro do modelo
+        for v in inventory:
+            if norm(v.get("modelo")) == modelo_norm:
+                return v
+        return None
+
+    # 1) Modelo aparece no texto: cruza com ano se informado.
     for v in inventory:
-        if norm(v.get("modelo")) and norm(v.get("modelo")) in text:
-            return v
+        m = norm(v.get("modelo"))
+        if m and m in text:
+            chosen = _match_modelo_ano(m, year)
+            if chosen:
+                return chosen
+
+    # 2) Só ano no texto + fallback_modelo (foco/contexto) -> exact match.
+    if year is not None and fallback_modelo:
+        fm = norm(fallback_modelo)
+        for v in inventory:
+            vm = norm(v.get("modelo"))
+            if vm and (vm in fm or fm in vm) and v.get("ano") == year:
+                return v
+
+    # 3) Só ano no texto + subset (vehicles_shown) -> match por ano dentro do
+    #    que já foi apresentado.
+    if year is not None and candidates_subset:
+        for v in candidates_subset:
+            if v.get("ano") == year:
+                return v
+
+    # 4) Marca no texto.
     for v in inventory:
         if norm(v.get("marca")) and norm(v.get("marca")) in text:
             return v
+
+    # 5) Título no texto.
     for v in inventory:
         if norm(v.get("titulo")) and norm(v.get("titulo")) in text:
             return v
+
+    # 6) Só ano sem mais nada -> primeiro veículo com esse ano.
+    if year is not None:
+        for v in inventory:
+            if v.get("ano") == year:
+                return v
+
     return None
 
 
@@ -53,8 +115,14 @@ async def pick_target_vehicle(
     if not inventory:
         return None
 
-    # 1) keyword na mensagem
-    v = _find_by_keyword(last_message, inventory)
+    # 1) keyword na mensagem (com ano + fallback_modelo do foco + subset shown)
+    shown_subset = [v for v in inventory if v.get("external_id") in (state.vehicles_shown or [])]
+    v = _find_by_keyword(
+        last_message,
+        inventory,
+        fallback_modelo=state.collected.veiculo_interesse,
+        candidates_subset=shown_subset,
+    )
     if v:
         log.info("photo_target_keyword", external_id=v.get("external_id"))
         return v
