@@ -115,11 +115,12 @@ Você é o "Lucas", atendente virtual da AMC Veículos (seminovos, Joinville/SC,
 - Turnos em sequência podem ir direto sem âncora — soa mais humano.
 
 # Regras de turno
-- Se `tools.pre_bubbles` (lista) está presente: o orquestrador já preparou as
-  bolhas com os veículos formatados (card ou lista). Sua função neste turno é
-  gerar APENAS 1 bolha: a pergunta de avanço. NÃO reescreva nem repita os dados
-  dos veículos — eles já estão na bolha anterior. NÃO comece com "Vi que você
-  se interessou".
+- Se `tools.pre_bubbles_already_sent=true`: o orquestrador JÁ ENVIOU as bolhas
+  com os veículos formatados (card ou lista). Você NÃO as vê, e NÃO precisa.
+  Sua função neste turno é gerar APENAS 1 bolha curta com a pergunta de avanço.
+  PROIBIDO listar veículos de novo, usar emojis 🚗 / 1️⃣ / 2️⃣ / 3️⃣, copiar
+  "Achei essas opções" ou repetir nome/ano/preço de qualquer veículo. A
+  apresentação JÁ aconteceu. NÃO comece com "Vi que você se interessou".
   * Use `tools.vehicles_presented_count` pra decidir SINGULAR vs PLURAL:
     - count == 1 → pergunta SINGULAR. Exemplos: "esse te interessou?",
       "topou nesse?", "quer ver mais detalhes desse?", "esse te chamou atenção?".
@@ -202,18 +203,36 @@ def _build_user_payload(
         }
         for m in history[-10:]
     ]
+    # Sanitiza tools antes de mostrar ao LLM: REMOVE pre_bubbles do payload.
+    # Razão: o LLM enxergava o template renderizado e copiava no texto, gerando
+    # bolha duplicada (template + cópia do template). Como o orchestrator já
+    # prepende pre_bubbles deterministicamente, o responder só precisa saber
+    # que a apresentação JÁ FOI FEITA, sem ver o conteúdo.
+    sanitized_tools: dict[str, Any] = {}
+    has_pre_bubbles = False
+    if tool_outputs:
+        for k, v in tool_outputs.items():
+            if k == "pre_bubbles":
+                has_pre_bubbles = bool(v)
+                continue
+            sanitized_tools[k] = v
+        if has_pre_bubbles:
+            sanitized_tools["pre_bubbles_already_sent"] = True
+
     payload: dict[str, Any] = {
         "state": state.model_dump(),
         "update": update.model_dump(),
         "history_recent": hist_compact,
         "last_message": last_message,
-        "tools": tool_outputs or {},
+        "tools": sanitized_tools,
     }
-    # Dica explícita pra ele gerar SÓ a pergunta quando há pre_bubbles
-    if tool_outputs and tool_outputs.get("pre_bubbles"):
+    if has_pre_bubbles:
         payload["instrucao_turno"] = (
-            "tools.pre_bubbles JÁ contém as bolhas com veículos prontas pra envio. "
-            "Você deve gerar EXATAMENTE 1 bolha de pergunta de avanço, sem separador |||."
+            "ATENÇÃO: o orquestrador JÁ ENVIOU bolhas com veículos formatados "
+            "(card ou lista). Você deve gerar APENAS 1 bolha curta com a pergunta "
+            "de avanço (foco singular/plural baseado em vehicles_presented_count). "
+            "PROIBIDO repetir os dados dos veículos, listar de novo, ou usar emojis "
+            "como 🚗 / 1️⃣. Sem separador |||."
         )
     return json.dumps(payload, ensure_ascii=False, default=str)
 
