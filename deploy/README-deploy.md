@@ -1,19 +1,20 @@
 # Deploy — `lucas-amc.appzoi.com.br`
 
-Stack: Docker Compose com app FastAPI, Postgres 16 e Caddy 2 (TLS automático).
+Stack: Docker Compose (app FastAPI + Postgres 16) atrás de **nginx host-level**
+com TLS via Let's Encrypt (certbot).
 
 ## Pré-requisitos
 
-1. **VPS Linux** (Ubuntu 22.04+) com root ou sudo.
-2. **Docker + Docker Compose v2** instalados.
-3. **Portas 80 e 443** abertas no firewall.
-4. **DNS A** de `lucas-amc.appzoi.com.br` → IP da VPS (verifique com `dig +short lucas-amc.appzoi.com.br`).
+1. **VPS Linux** com Docker + Compose v2, nginx e certbot já instalados.
+2. **DNS A** de `lucas-amc.appzoi.com.br` → IP da VPS.
+3. **Portas 80 e 443** abertas no firewall (já em uso pelo nginx).
+4. Porta interna `127.0.0.1:8000` livre (a app vai bindar nela).
 
 ## 1. Clonar repo na VPS
 
 ```bash
-git clone https://github.com/raul-behnke/zaf-amcveiculos-v4.git /opt/zoi
-cd /opt/zoi/deploy
+git clone https://github.com/raul-behnke/zaf-amcveiculos-v4.git /opt/lucas-amc
+cd /opt/lucas-amc/deploy
 ```
 
 ## 2. Criar `.env.prod`
@@ -23,34 +24,47 @@ cp .env.prod.example .env.prod
 nano .env.prod
 ```
 
-Preencha:
-- `OPENAI_API_KEY` (gere nova no dashboard OpenAI — não reuse a de dev)
-- `GHL_PIT_TOKEN` (PIT do GHL)
-- `WEBHOOK_SECRET=$(openssl rand -hex 32)` — secret longo aleatório
-- `POSTGRES_PASSWORD=$(openssl rand -hex 24)` — senha forte do DB
+Preencher pelo menos:
+- `OPENAI_API_KEY`
+- `GHL_PIT_TOKEN`
+- `WEBHOOK_SECRET=$(openssl rand -hex 32)`
+- `POSTGRES_PASSWORD=$(openssl rand -hex 24)`
 
-Os demais IDs (custom values, calendar, workflow) já vêm preenchidos com os valores reais.
+Os IDs do GHL (custom values, calendar, workflow) já vêm preenchidos.
 
-## 3. Subir a stack
+## 3. Subir Postgres + App
 
 ```bash
+cd /opt/lucas-amc/deploy
 docker compose -f compose.prod.yml --env-file .env.prod up -d --build
 ```
 
-Caddy demora ~60s pra obter TLS na 1ª execução. Acompanhe:
+Verificar que app sobe na porta local:
 
 ```bash
-docker compose -f compose.prod.yml logs -f caddy
-docker compose -f compose.prod.yml logs -f app
+curl -s http://127.0.0.1:8000/health
+# esperado: {"status":"ok","db":true}
 ```
 
-## 4. Validar
+## 4. Configurar nginx + TLS
 
 ```bash
-# Health endpoint (local)
-docker compose -f compose.prod.yml exec app curl -s http://localhost:8000/health
+# 4.1 Copia o vhost
+cp nginx-vhost.conf /etc/nginx/sites-available/lucas-amc.appzoi.com.br.conf
+ln -sf /etc/nginx/sites-available/lucas-amc.appzoi.com.br.conf \
+       /etc/nginx/sites-enabled/lucas-amc.appzoi.com.br
 
-# Health endpoint (público, via TLS)
+# 4.2 Obtém o certificado (vai instalar e recarregar nginx)
+certbot --nginx -d lucas-amc.appzoi.com.br --non-interactive --agree-tos -m admin@appzoi.com.br
+
+# 4.3 Verifica config + reload
+nginx -t && systemctl reload nginx
+```
+
+## 5. Validar fim-a-fim
+
+```bash
+# Public health
 curl -fsSL https://lucas-amc.appzoi.com.br/health
 # esperado: {"status":"ok","db":true}
 
@@ -60,9 +74,7 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 # esperado: 403
 ```
 
-## 5. Atualizar config GHL
-
-Substitua a URL dos workflows GHL para:
+## 6. URLs pra GHL
 
 ```
 Saudação: https://lucas-amc.appzoi.com.br/sessions/{{contact.id}}/greet?secret=<WEBHOOK_SECRET>
@@ -70,48 +82,39 @@ Inbound:  https://lucas-amc.appzoi.com.br/webhook/inbound?secret=<WEBHOOK_SECRET
 Abandon:  https://lucas-amc.appzoi.com.br/sessions/{{contact.id}}/abandon?secret=<WEBHOOK_SECRET>
 ```
 
-Apague workflows antigos apontando pra ngrok ou caminhos errados (`/webhooks/ghl/inbound`).
+Apague workflows antigos apontando pra ngrok ou caminhos errados.
 
 ## Operação
 
 | Tarefa | Comando |
 |---|---|
-| Logs app (follow) | `docker compose -f compose.prod.yml logs -f app` |
-| Restart app | `docker compose -f compose.prod.yml restart app` |
-| Update código | `git pull && docker compose -f compose.prod.yml up -d --build app` |
-| Backup DB | `docker compose -f compose.prod.yml exec postgres pg_dump -U zoi zoi_agent > /var/backups/zoi-$(date +%F).sql` |
-| Shell app | `docker compose -f compose.prod.yml exec app bash` |
-| Métricas | `curl -s http://localhost:8000/metrics` (de dentro da VPS) |
-| Parar tudo | `docker compose -f compose.prod.yml down` (mantém volumes) |
+| Logs app | `docker compose -f /opt/lucas-amc/deploy/compose.prod.yml logs -f app` |
+| Restart app | `docker compose -f /opt/lucas-amc/deploy/compose.prod.yml restart app` |
+| Update código | `cd /opt/lucas-amc && git pull && cd deploy && docker compose -f compose.prod.yml up -d --build app` |
+| Backup DB | `docker compose -f /opt/lucas-amc/deploy/compose.prod.yml exec -T postgres pg_dump -U zoi zoi_agent | gzip > /var/backups/lucas-amc-$(date +%F).sql.gz` |
+| Shell app | `docker compose -f /opt/lucas-amc/deploy/compose.prod.yml exec app bash` |
+| nginx reload | `nginx -t && systemctl reload nginx` |
+| Renovar TLS (automático) | `certbot renew --quiet` (certbot já agenda timer) |
 
-## Backup automático (sugestão)
+## Backup automático
 
 ```bash
-# /etc/cron.daily/zoi-pgdump
+cat > /etc/cron.daily/lucas-amc-pgdump <<'EOF'
 #!/bin/sh
-cd /opt/zoi/deploy
+cd /opt/lucas-amc/deploy
 docker compose -f compose.prod.yml exec -T postgres \
-  pg_dump -U zoi zoi_agent | gzip > /var/backups/zoi-$(date +%F).sql.gz
-find /var/backups -name "zoi-*.sql.gz" -mtime +14 -delete
+  pg_dump -U zoi zoi_agent | gzip > /var/backups/lucas-amc-$(date +%F).sql.gz
+find /var/backups -name "lucas-amc-*.sql.gz" -mtime +14 -delete
+EOF
+chmod +x /etc/cron.daily/lucas-amc-pgdump
 ```
-
-```bash
-chmod +x /etc/cron.daily/zoi-pgdump
-```
-
-## Hardening pós-deploy
-
-1. **Trocar senha root** (`passwd root`) e configurar **SSH key**, desabilitar login por senha em `/etc/ssh/sshd_config`.
-2. **UFW**: liberar só portas 22, 80, 443.
-3. **Proteger /metrics** — descomente a seção no `Caddyfile` e gere hash bcrypt com `docker run caddy caddy hash-password`.
-4. **Fail2ban** pra proteger SSH.
-5. **Rotate WEBHOOK_SECRET** trimestral.
 
 ## Troubleshooting
 
 | Sintoma | Causa provável | Fix |
 |---|---|---|
-| 502 Bad Gateway | App não subiu | `docker compose logs app` — provavelmente env var faltando |
-| Caddy não obtém TLS | DNS não propagou | `dig lucas-amc.appzoi.com.br` deve apontar pro IP |
-| 403 em todos endpoints | Secret errado no GHL | Re-cole `WEBHOOK_SECRET` no workflow |
-| `db: false` no /health | Postgres não respondeu | `docker compose logs postgres` |
+| 502 Bad Gateway | App não respondeu na :8000 | `docker compose logs app` |
+| Cert SSL falhou | DNS não propagou | `dig +short lucas-amc.appzoi.com.br` |
+| 403 em endpoints | Secret errado no GHL | Re-cole `WEBHOOK_SECRET` |
+| `db: false` | Postgres não subiu | `docker compose logs postgres` |
+| Conflito de porta | Outro processo na 8000 | `ss -tlnp \| grep 8000` |

@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: zoi_agent
     volumes:
       - pg_data:/var/lib/postgresql/data
+    # Postgres só na rede interna do compose — sem porta exposta no host
+    # (evita conflito com outros postgres já rodando na VPS).
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zoi -d zoi_agent"]
       interval: 5s
@@ -28,29 +30,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    expose:
-      - "8000"
+    # App escuta 127.0.0.1:8000 — nginx host-level faz proxy + TLS.
+    # NÃO publica em 0.0.0.0 pra evitar bypass do nginx.
+    ports:
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "curl", "-fsSL", "http://localhost:8000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: zoi_caddy_prod
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
-
 volumes:
   pg_data:
-  caddy_data:
-  caddy_config:
