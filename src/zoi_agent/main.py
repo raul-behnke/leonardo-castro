@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     log.info("app_stopped")
 
 
-app = FastAPI(title="ZOI Agent — AMC Veículos", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="ZOI Agent — Castro Veículos", version="0.1.0", lifespan=lifespan)
 
 from zoi_agent.endpoints.abandon import router as abandon_router  # noqa: E402
 from zoi_agent.endpoints.greet import router as greet_router  # noqa: E402

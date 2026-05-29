@@ -19,7 +19,7 @@ def _full_state(appointment=None) -> SessionState:
             troca_completa=TrocaInfo(modelo="Gol", ano=2001, km=280000, quitado=True),
             motivo_compra_ou_troca="precisando de SUV",
             forma_pagamento="financiado",
-            cidade="Joinville",
+            cidade="Taubaté",
             interesse_agendamento=True,
         ),
         appointment=appointment,
@@ -35,7 +35,7 @@ def test_note_qualificado_agendado() -> None:
     )
     assert "[ZOI] Qualificação — qualificado_agendado" in note
     assert "Lead: Raul" in note
-    assert "Cidade: Joinville" in note
+    assert "Cidade: Taubaté" in note
     assert "Veículo de interesse: Renault Duster" in note
     assert "Foco definido: sim" in note
     assert "Intenção: troca" in note

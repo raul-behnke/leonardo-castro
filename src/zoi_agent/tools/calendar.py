@@ -4,7 +4,7 @@ PLAN §11:
 - GET /calendars/{id}/free-slots janela hoje + amanhã + depois (3 dias)
 - Filtra por preferência (dia + periodo: manha/tarde/noite)
 - Retorna até 3 slots, espalhando entre dias
-- POST /calendars/events/appointments: confirmed, 60min, title "Visita AMC — {nome} — {modelo}"
+- POST /calendars/events/appointments: confirmed, 60min, title "Visita Castro — {nome} — {modelo}"
 - assignedUserId omitido (default do calendar), address omitido
 """
 from __future__ import annotations
@@ -172,7 +172,7 @@ async def book_appointment(
     tz = ZoneInfo(settings.app_timezone)
     start = dtparser.isoparse(slot_iso).astimezone(tz)
     end = start + timedelta(minutes=settings.ghl_appointment_duration_min)
-    title = f"Visita AMC — {lead_name or 'Lead'} — {modelo or 'sem modelo'}"
+    title = f"Visita Castro — {lead_name or 'Lead'} — {modelo or 'sem modelo'}"
     payload = {
         "calendarId": settings.ghl_calendar_id,
         "locationId": settings.ghl_location_id,

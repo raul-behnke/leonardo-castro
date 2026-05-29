@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "zoi-agent"
 version = "0.1.0"
-description = "AMC Veículos WhatsApp agent (ZOI fork) - GHL integration"
+description = "Castro Veículos WhatsApp agent (ZOI fork) - GHL integration"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

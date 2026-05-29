@@ -30,7 +30,7 @@ async def scenario_c5_extrai_nome() -> None:
         sentiment="neutro",
         intent="qualificar",
     )
-    history = [msg("outbound", "Olá! Bem-vindo à AMC. Está procurando algum carro específico?")]
+    history = [msg("outbound", "Olá! Bem-vindo à Castro. Está procurando algum carro específico?")]
     bubbles = await run_responder(
         state=state, update=update, history=history,
         last_message="oi, me chamo Raul",

@@ -16,12 +16,12 @@ log = get_logger(__name__)
 
 
 GREET_SEM_VEICULO = (
-    "Olá! 👋 Bem-vindo à AMC Veículos.\n"
+    "Olá! 👋 Bem-vindo à Castro Veículos.\n"
     "Como posso te ajudar hoje? Está procurando algum carro específico?"
 )
 
 GREET_COM_VEICULO_TMPL = (
-    "Olá! 👋 Bem-vindo à AMC Veículos.\n"
+    "Olá! 👋 Bem-vindo à Castro Veículos.\n"
     "Vi que você demonstrou interesse no {veiculo} 🚗\n"
     "Posso te passar mais informações sobre ele?"
 )

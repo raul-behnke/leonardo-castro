@@ -26,10 +26,10 @@ async def test_faq_cache_hits_only_once(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_faq_parses_yaml(monkeypatch) -> None:
     async def fake_fetch() -> str:
-        return "financiamento: sim\nlocalizacao: Joinville"
+        return "financiamento: sim\nlocalizacao: Taubaté"
 
     fresh = faq_mod.TTLCache(ttl_seconds=60, loader=fake_fetch)
     monkeypatch.setattr(faq_mod, "_faq_cache", fresh)
     parsed = await faq_mod.get_faq_parsed()
     assert parsed["financiamento"] == "sim"
-    assert parsed["localizacao"] == "Joinville"
+    assert parsed["localizacao"] == "Taubaté"

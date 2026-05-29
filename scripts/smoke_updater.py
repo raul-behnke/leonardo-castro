@@ -26,7 +26,7 @@ SCENARIOS: list[tuple[str, SessionState, list[dict], str]] = [
             veiculo_origem=VeiculoOrigem(texto="Renault Duster"),
         ),
         [
-            msg("outbound", "Olá! Bem-vindo à AMC. Está procurando algum carro específico?"),
+            msg("outbound", "Olá! Bem-vindo à Castro. Está procurando algum carro específico?"),
         ],
         "oi, me chamo Raul",
     ),
@@ -51,7 +51,7 @@ SCENARIOS: list[tuple[str, SessionState, list[dict], str]] = [
                 possui_troca=False,
                 motivo_compra_ou_troca="trabalho",
                 forma_pagamento="financiado",
-                cidade="Joinville",
+                cidade="Taubaté",
                 interesse_agendamento=True,
             ),
         ),

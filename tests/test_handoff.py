@@ -21,7 +21,7 @@ def patches(monkeypatch):
 
 
 def _state() -> SessionState:
-    return SessionState(collected=Collected(nome="Raul", cidade="Joinville"))
+    return SessionState(collected=Collected(nome="Raul", cidade="Taubaté"))
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_handoff_full_success(patches) -> None:
     note_arg = patches["note"].await_args.args[1]
     assert "handoff_solicitado" in note_arg
     assert "Raul" in note_arg
-    assert "Joinville" in note_arg
+    assert "Taubaté" in note_arg
     assert "lead pediu" in note_arg
     patches["wf"].assert_awaited_once_with("c1", settings.ghl_handoff_workflow_id)
 

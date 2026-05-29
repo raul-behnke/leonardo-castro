@@ -33,7 +33,7 @@ def test_compute_missing_troca_completa_ok() -> None:
 
 
 def test_merge_preserva_campos_existentes() -> None:
-    state = SessionState(collected=Collected(nome="Raul", cidade="Joinville"))
+    state = SessionState(collected=Collected(nome="Raul", cidade="Taubaté"))
     upd = StateUpdate(
         stage="descoberta",
         collected=Collected(nome="Outro"),  # tenta sobrescrever
@@ -44,7 +44,7 @@ def test_merge_preserva_campos_existentes() -> None:
     )
     new = merge_into_state(state, upd)
     assert new.collected.nome == "Raul"  # não regrediu
-    assert new.collected.cidade == "Joinville"
+    assert new.collected.cidade == "Taubaté"
     assert new.stage == "descoberta"
 
 
@@ -52,14 +52,14 @@ def test_merge_preenche_campo_vazio() -> None:
     state = SessionState(collected=Collected(nome="Raul"))
     upd = StateUpdate(
         stage="descoberta",
-        collected=Collected(nome="Raul", cidade="Joinville"),
+        collected=Collected(nome="Raul", cidade="Taubaté"),
         missing=[],
         next_action="x",
         sentiment="neutro",
         intent="qualificar",
     )
     new = merge_into_state(state, upd)
-    assert new.collected.cidade == "Joinville"
+    assert new.collected.cidade == "Taubaté"
 
 
 def test_merge_increments_counters() -> None:

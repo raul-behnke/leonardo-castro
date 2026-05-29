@@ -17,8 +17,8 @@ log = get_logger(__name__)
 
 
 SYSTEM_PROMPT = f"""\
-Você é o COMPONENTE DE ESTADO de um atendente virtual chamado "Lucas" da AMC Veículos
-(seminovos, Joinville/SC). Sua função é APENAS extrair estado estruturado.
+Você é o COMPONENTE DE ESTADO de um atendente virtual chamado "Leonardo" da Castro Veículos
+(seminovos, Taubaté/SP). Sua função é APENAS extrair estado estruturado.
 
 Você NÃO gera texto pro cliente. Outro componente (responder) faz isso. Aqui você só
 preenche o schema StateUpdate com base em:
@@ -61,7 +61,7 @@ não só de respostas diretas. Exemplos:
   - "vocês aceitam troca?" → intencao="troca", possui_troca=true
   - "tenho um Gol 2010 quitado" → possui_troca=true,
     troca_completa={{modelo:"Gol", ano:2010, quitado:true}}
-  - "moro em Joinville" → cidade="Joinville"
+  - "moro em Taubaté" → cidade="Taubaté"
   - "vou financiar" → forma_pagamento="financiado"
   - "queria à vista" → forma_pagamento="a_vista"
   - "tô pensando em comprar direto" / "comprar mesmo" / "comprar sem troca"
@@ -169,7 +169,7 @@ def _build_user_payload(
 ) -> str:
     hist_compact = [
         {
-            "from": "lead" if m.get("direction") == "inbound" else "lucas",
+            "from": "lead" if m.get("direction") == "inbound" else "leonardo",
             "type": m.get("messageType") or m.get("type"),
             "body": (m.get("body") or "")[:500],
             "ts": m.get("dateAdded"),

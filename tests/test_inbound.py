@@ -14,7 +14,7 @@ from zoi_agent.main import app
 
 
 def test_strip_received_on() -> None:
-    assert inb.strip_received_on("Olá!\n\nReceived on 📱[Lucas]") == "Olá!"
+    assert inb.strip_received_on("Olá!\n\nReceived on 📱[Leonardo]") == "Olá!"
     assert inb.strip_received_on("Tudo bem? \n  Received on [device]") == "Tudo bem?"
     assert inb.strip_received_on("texto simples") == "texto simples"
     assert inb.strip_received_on("") == ""
@@ -22,16 +22,16 @@ def test_strip_received_on() -> None:
 
 
 def test_strip_voice_note_marker() -> None:
-    body = "> Voice Note < \n\nReceived on 📱[Lucas]"
+    body = "> Voice Note < \n\nReceived on 📱[Leonardo]"
     assert inb.strip_received_on(body) == ""
 
 
 def test_strip_image_marker() -> None:
-    assert inb.strip_received_on("> Image <\n\nReceived on 📱[Lucas]") == ""
+    assert inb.strip_received_on("> Image <\n\nReceived on 📱[Leonardo]") == ""
 
 
 def test_strip_whatsapp_quote() -> None:
-    body = "↪︎ Tem sim garantia.\nVai usar troca?\n\nTenho um Gol 2001\n\nReceived on 📱[Lucas]"
+    body = "↪︎ Tem sim garantia.\nVai usar troca?\n\nTenho um Gol 2001\n\nReceived on 📱[Leonardo]"
     assert inb.strip_received_on(body) == "Tenho um Gol 2001"
 
 
@@ -159,7 +159,7 @@ def test_c5_texto_dispatch(patch_all) -> None:
         [
             {"direction": "outbound", "dateAdded": "2026-05-27T10:00Z", "body": "oi"},
             {"direction": "inbound", "dateAdded": "2026-05-27T11:00Z",
-             "body": "Quero ver opções\n\nReceived on 📱[Lucas]", "attachments": []},
+             "body": "Quero ver opções\n\nReceived on 📱[Leonardo]", "attachments": []},
         ]
     )
     with TestClient(app) as c:
@@ -177,7 +177,7 @@ def test_c12_so_imagem_ignora(patch_all) -> None:
     patch_all["messages"].return_value = _msgs(
         [
             {"direction": "inbound", "dateAdded": "2026-05-27T11:00Z",
-             "body": "Received on 📱[Lucas]",  # sufixo only -> strip = vazio
+             "body": "Received on 📱[Leonardo]",  # sufixo only -> strip = vazio
              "attachments": ["https://x/foto.jpg"]},
         ]
     )
@@ -193,7 +193,7 @@ def test_c10_audio_transcrevido(patch_all) -> None:
     patch_all["messages"].return_value = _msgs(
         [
             {"direction": "inbound", "dateAdded": "2026-05-27T11:00Z",
-             "body": "Received on 📱[Lucas]",
+             "body": "Received on 📱[Leonardo]",
              "attachments": ["https://x/audio.ogg"]},
         ]
     )
@@ -211,7 +211,7 @@ def test_c11_multi_audio_concat(patch_all) -> None:
     patch_all["messages"].return_value = _msgs(
         [
             {"direction": "inbound", "dateAdded": "2026-05-27T11:00Z",
-             "body": "Received on 📱[Lucas]",
+             "body": "Received on 📱[Leonardo]",
              "attachments": ["https://x/a.ogg", "https://x/b.opus"]},
         ]
     )
@@ -276,11 +276,11 @@ def test_rajada_de_msgs_agregada(patch_all) -> None:
         [
             {"direction": "outbound", "dateAdded": "2026-05-27T10:00Z", "body": "Me passa o ano e km?"},
             {"direction": "inbound", "dateAdded": "2026-05-27T10:01Z",
-             "body": "2013\n\nReceived on 📱[Lucas]", "attachments": []},
+             "body": "2013\n\nReceived on 📱[Leonardo]", "attachments": []},
             {"direction": "inbound", "dateAdded": "2026-05-27T10:01:05Z",
-             "body": "280mil km\n\nReceived on 📱[Lucas]", "attachments": []},
+             "body": "280mil km\n\nReceived on 📱[Leonardo]", "attachments": []},
             {"direction": "inbound", "dateAdded": "2026-05-27T10:01:10Z",
-             "body": "Ta quitadinho\n\nReceived on 📱[Lucas]", "attachments": []},
+             "body": "Ta quitadinho\n\nReceived on 📱[Leonardo]", "attachments": []},
         ]
     )
     with TestClient(app) as c:
@@ -299,7 +299,7 @@ def test_audio_e_texto_concat(patch_all) -> None:
     patch_all["messages"].return_value = _msgs(
         [
             {"direction": "inbound", "dateAdded": "2026-05-27T11:00Z",
-             "body": "olha esse\n\nReceived on 📱[Lucas]",
+             "body": "olha esse\n\nReceived on 📱[Leonardo]",
              "attachments": ["https://x/a.ogg"]},
         ]
     )

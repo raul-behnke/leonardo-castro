@@ -1,17 +1,17 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: zoi_postgres
+    container_name: castro_postgres
     environment:
-      POSTGRES_USER: zoi
-      POSTGRES_PASSWORD: zoi
-      POSTGRES_DB: zoi_agent
+      POSTGRES_USER: castro
+      POSTGRES_PASSWORD: castro
+      POSTGRES_DB: castro_agent
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - ./postgres_data_castro:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zoi -d zoi_agent"]
+      test: ["CMD-SHELL", "pg_isready -U castro -d castro_agent"]
       interval: 5s
       timeout: 3s
       retries: 10

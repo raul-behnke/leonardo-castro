@@ -1,6 +1,6 @@
-# ZOI — AMC Veículos (WhatsApp Agent)
+# ZOI — Castro Veículos (WhatsApp Agent)
 
-Atendente virtual "Lucas" da AMC Veículos (seminovos, Joinville/SC) sobre GHL +
+Atendente virtual "Leonardo" da Castro Veículos (seminovos, Taubaté/SP) sobre GHL +
 WhatsApp Plugin. Pipeline 2-LLM (updater + responder), persistência Postgres,
 métricas Prometheus.
 

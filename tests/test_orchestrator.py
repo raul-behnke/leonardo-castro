@@ -460,7 +460,7 @@ async def test_c13_regressao_stage_apresentacao(monkeypatch, patch_deps) -> None
             veiculo_interesse_confirmado=True,
             intencao="compra_direta",
             forma_pagamento="financiado",
-            cidade="Joinville",
+            cidade="Taubaté",
             interesse_agendamento=True,
         ),
     )
@@ -485,7 +485,7 @@ async def test_c13_regressao_stage_apresentacao(monkeypatch, patch_deps) -> None
     assert saved.stage == "apresentacao"  # regrediu de fechamento
     # campos preservados (não regrediram para None)
     assert saved.collected.veiculo_interesse == "Duster"
-    assert saved.collected.cidade == "Joinville"
+    assert saved.collected.cidade == "Taubaté"
     assert saved.terminal_reason is None
 
 

@@ -32,7 +32,7 @@ def test_missing_vazio_quando_tudo_preenchido() -> None:
         nome="Raul", veiculo_interesse="Duster", veiculo_interesse_confirmado=True,
         intencao="compra_direta", possui_troca=False,
         motivo_compra_ou_troca="trabalho", forma_pagamento="financiado",
-        cidade="Joinville", interesse_agendamento=True,
+        cidade="Taubaté", interesse_agendamento=True,
     )
     assert compute_missing(c) == []
 

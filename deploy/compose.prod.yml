@@ -1,18 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: zoi_postgres_prod
+    container_name: castro_postgres_prod
     restart: unless-stopped
     environment:
-      POSTGRES_USER: zoi
+      POSTGRES_USER: castro
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obrigatório}
-      POSTGRES_DB: zoi_agent
+      POSTGRES_DB: castro_agent
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data_castro:/var/lib/postgresql/data
     # Postgres só na rede interna do compose — sem porta exposta no host
     # (evita conflito com outros postgres já rodando na VPS).
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zoi -d zoi_agent"]
+      test: ["CMD-SHELL", "pg_isready -U castro -d castro_agent"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -21,19 +21,20 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    container_name: zoi_app_prod
+    container_name: castro_app_prod
     restart: unless-stopped
     env_file:
       - .env.prod
     environment:
-      DATABASE_URL: postgresql+asyncpg://zoi:${POSTGRES_PASSWORD}@postgres:5432/zoi_agent
+      DATABASE_URL: postgresql+asyncpg://castro:${POSTGRES_PASSWORD}@postgres:5432/castro_agent
     depends_on:
       postgres:
         condition: service_healthy
-    # App escuta 127.0.0.1:8000 — nginx host-level faz proxy + TLS.
+    # App escuta 127.0.0.1:8001 — nginx host-level faz proxy + TLS.
     # NÃO publica em 0.0.0.0 pra evitar bypass do nginx.
+    # Porta 8001 (8000 já usada pelo agente AMC na mesma VPS).
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8000"
     healthcheck:
       test: ["CMD", "curl", "-fsSL", "http://localhost:8000/health"]
       interval: 30s
@@ -41,4 +42,4 @@ services:
       retries: 3
 
 volumes:
-  pg_data:
+  pg_data_castro:

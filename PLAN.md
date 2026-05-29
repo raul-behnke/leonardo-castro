@@ -1,6 +1,6 @@
-# AMC Veículos — Agente WhatsApp (ZOI fork)
+# Castro Veículos — Agente WhatsApp (ZOI fork)
 
-Plano consolidado. Cliente: AMC Veículos (seminovos, Joinville/SC). Base: ZOI Agno + GHL.
+Plano consolidado. Cliente: Castro Veículos (seminovos, Taubaté/SP). Base: ZOI Agno + GHL.
 
 ---
 
@@ -12,7 +12,7 @@ Plano consolidado. Cliente: AMC Veículos (seminovos, Joinville/SC). Base: ZOI A
 | Auth GHL | PIT single-tenant |
 | Estoque | GHL Custom Value JSON (`cqH4Ba3hcS0Xuzvy4izA`), 36 veículos, cache 5min |
 | FAQ | GHL Custom Value YAML (`iD172rYRHqf0aLdtGz0H`), ~5KB, cache 5min |
-| Calendário | `kmDqEOaOt4479ipBYZtn`, presencial Rua Iririu 2464 Joinville, 60min |
+| Calendário | `kmDqEOaOt4479ipBYZtn`, presencial R. Noruega 72 Taubaté, 60min |
 | Workflow handoff | `b759fd01-2867-45b9-a8c8-74490793e261` (dispara em qualificado_agendado, qualificado_sem_agenda, handoff_solicitado, handoff_erro) |
 | Tag gate | `agente-ia` no contato. Sem tag → webhook ignora. Remover tag = opt-out/handoff. |
 | Atendimento | 24/7 |
@@ -21,9 +21,9 @@ Plano consolidado. Cliente: AMC Veículos (seminovos, Joinville/SC). Base: ZOI A
 
 ---
 
-## 2. Persona — Lucas
+## 2. Persona — Leonardo
 
-**Quem é**: atendente virtual da AMC Veículos. Não declara IA (evasivo); se perguntado de novo, admite: *"Sou um atendente digital da AMC, qualquer detalhe específico passo pra um consultor."*
+**Quem é**: atendente virtual da Castro Veículos. Não declara IA (evasivo); se perguntado de novo, admite: *"Sou um atendente digital da Castro, qualquer detalhe específico passo pra um consultor."*
 
 **Tom**: pré-atendente experiente, brasileiro popular, confiante, direto. Soa como quem já fez mil atendimentos — nunca formulário.
 
@@ -45,13 +45,13 @@ Plano consolidado. Cliente: AMC Veículos (seminovos, Joinville/SC). Base: ZOI A
 
 ### Sem veículo de interesse
 ```
-Olá! 👋 Bem-vindo à AMC Veículos.
+Olá! 👋 Bem-vindo à Castro Veículos.
 Como posso te ajudar hoje? Está procurando algum carro específico?
 ```
 
 ### Com veículo de interesse (custom field `Veículo de Interesse` preenchido)
 ```
-Olá! 👋 Bem-vindo à AMC Veículos.
+Olá! 👋 Bem-vindo à Castro Veículos.
 Vi que você demonstrou interesse no {{veiculo_interesse}} 🚗
 Posso te passar mais informações sobre ele?
 ```
@@ -281,7 +281,7 @@ Estados que geram nota + workflow:
 - `POST /calendars/events/appointments`:
   - `calendarId`, `locationId`, `contactId` ✓
   - `startTime`/`endTime` ISO8601 com offset SP
-  - `title`: `"Visita AMC — {nome} — {modelo_interesse}"`
+  - `title`: `"Visita Castro — {nome} — {modelo_interesse}"`
   - `appointmentStatus`: `confirmed`
   - `assignedUserId`: omitido
   - `address`: omitido
@@ -418,7 +418,7 @@ Script de testes manuais — cada cenário usa contato GHL real (criar contato d
 - Lead: "você é robô?". Esperado: evasivo. `ai_identity_asked_count=1`.
 
 ### C18 — Pergunta sobre identidade (2ª)
-- Esperado: admite ("Sou um atendente digital da AMC...").
+- Esperado: admite ("Sou um atendente digital da Castro...").
 
 ### C19 — Agendamento gate
 - Lead diz "quero agendar" mas `vehicle_focus_definido=false`. Esperado: agent puxa foco antes de propor slots.
@@ -445,7 +445,7 @@ Script de testes manuais — cada cenário usa contato GHL real (criar contato d
 Ordem fase a fase. Cada sprint termina com smoke test do cenário relevante.
 
 ### Sprint 0 — Bootstrap
-- Fork ZOI base p/ workspace `zaf-amcveiculos-plan/`.
+- Fork ZOI base p/ workspace `zaf-castroveiculos-plan/`.
 - `pyproject.toml`, `.env`, `pip install -e ".[dev]"`.
 - Postgres local + Agno auto-create schema.
 - Logger `structlog` JSON + Prometheus client.
@@ -472,7 +472,7 @@ Ordem fase a fase. Cada sprint termina com smoke test do cenário relevante.
 - Test: cenários de extração (input fake conversation → state esperado).
 
 ### Sprint 6 — Responder LLM
-- `agent/responder.py`: prompt persona Lucas + multi-bubble parser.
+- `agent/responder.py`: prompt persona Leonardo + multi-bubble parser.
 - Test: gera bubbles válidos, última pergunta = próximo campo.
 
 ### Sprint 7 — Orchestrator

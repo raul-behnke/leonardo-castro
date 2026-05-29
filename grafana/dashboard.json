@@ -1,11 +1,11 @@
 {
-  "title": "ZOI — AMC Veículos",
+  "title": "ZOI — Castro Veículos",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "30s",
   "time": {"from": "now-24h", "to": "now"},
   "timezone": "America/Sao_Paulo",
-  "tags": ["zoi", "amc"],
+  "tags": ["zoi", "castro"],
   "templating": {
     "list": [
       {

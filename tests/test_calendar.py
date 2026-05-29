@@ -160,7 +160,7 @@ async def test_book_appointment_payload(mock_client) -> None:
     assert payload["locationId"] == settings.ghl_location_id
     assert payload["contactId"] == "c1"
     assert payload["appointmentStatus"] == "confirmed"
-    assert payload["title"] == "Visita AMC — Raul — Renault Duster"
+    assert payload["title"] == "Visita Castro — Raul — Renault Duster"
     assert payload["startTime"].startswith("2026-06-03T09:30:00")
     # endTime = start + 60min
     assert payload["endTime"].startswith("2026-06-03T10:30:00")
