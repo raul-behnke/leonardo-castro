@@ -109,6 +109,7 @@ async def _dispatch_tools(
     update_intent_sec: str | None,
     last_message: str,
     state,
+    preferencia_horario=None,
 ) -> dict[str, Any]:
     out: dict[str, Any] = {}
 
@@ -173,11 +174,12 @@ async def _dispatch_tools(
     quer_agendar = bool(state.collected.interesse_agendamento)
     focus_ok = bool(state.collected.veiculo_interesse_confirmado)
     if quer_agendar and focus_ok:
-        pref = None
-        # preferencia vem do update; mas só vemos isso no dispatcher novo (não temos
-        # update aqui). Vamos propor sem filtro de pref e o responder ordena.
+        dia_pref = preferencia_horario.dia if preferencia_horario else None
+        periodo_pref = preferencia_horario.periodo if preferencia_horario else None
         try:
-            slots = await propose_slots(limit=3)
+            slots = await propose_slots(limit=3, dia=dia_pref, periodo=periodo_pref)
+            if not slots and (dia_pref or periodo_pref):
+                slots = await propose_slots(limit=3)
             out["slots"] = [{"iso": s.iso, "label": s.label_pt()} for s in slots]
         except Exception as e:
             log.error("propose_slots_failed", err=str(e))
@@ -343,6 +345,7 @@ async def _run_turn(contact_id: str, last_message: str) -> None:
         update_intent_sec=update.intent_secundario,
         last_message=last_message,
         state=new_state,
+        preferencia_horario=update.preferencia_horario,
     )
     tools["next_question"] = {
         "field": next_q.field,
