@@ -123,7 +123,7 @@ Regressão de stage é permitida (lead pode pedir ver outro carro em fechamento)
 - "apresentar": quer ver opções de veículos.
 
 # intent_secundario (não exclusivo)
-- "duvida_operacional": pergunta sobre processo (paga, financia, troca, doc) → responder vai chamar get_faq.
+- "duvida_operacional": pergunta sobre processo, preço, valor, financiamento, parcela, troca, documentação, garantia, horário, endereço, condições. Exemplos: "qual o valor?", "quanto custa?", "tem desconto?", "vocês financiam pelo X?", "trabalham com qual banco?", "qual a taxa?", "tem garantia?", "que horas abre?". → responder vai chamar get_faq / detalhes do veículo.
 - "ver_outros_carros": quer alternativas → search_inventory.
 - "pedido_foto": pediu imagem.
 

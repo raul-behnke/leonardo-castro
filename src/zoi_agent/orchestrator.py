@@ -117,7 +117,11 @@ async def _dispatch_tools(
     # -> traz matches do estoque ANTES de qualificar (PLAN §5 + §16 C4).
     # Gate simplificado: usa vehicles_shown vazio como derivação de "lead
     # nunca viu catálogo nosso". Sem flag separado de origem_apresentada.
-    if state.veiculo_origem and not state.vehicles_shown:
+    # Pula apresentação de catálogo quando lead chegou com dúvida pontual
+    # (preço, financiamento, etc) — responde a dúvida primeiro, catálogo no
+    # próximo turno se ainda fizer sentido.
+    skip_origem = update_intent_sec in ("duvida_operacional", "pedido_foto")
+    if state.veiculo_origem and not state.vehicles_shown and not skip_origem:
         try:
             origem = await buscar_veiculo_interesse_origem(state)
             if origem:
