@@ -30,7 +30,7 @@ from zoi_agent.metrics import TURNS_TOTAL
 from zoi_agent.tools.calendar import book_appointment, propose_slots
 from zoi_agent.tools.faq import get_faq_raw
 from zoi_agent.tools.handoff import encaminhar_para_vendedor
-from zoi_agent.tools.inventory import search_inventory
+from zoi_agent.tools.inventory import get_vehicle_details, search_inventory
 from zoi_agent.tools.origem import buscar_veiculo_interesse_origem
 from zoi_agent.tools.photos import build_photo_payload
 from zoi_agent.tools.terminal import TERMINAL_REASONS
@@ -135,6 +135,37 @@ async def _dispatch_tools(
         except Exception as e:
             log.error("faq_fetch_failed", err=str(e))
             out["faq_yaml"] = ""
+
+    # Sempre que houver foco identificável num veículo do estoque, injeta
+    # detalhes (preço, km, ano, cor, combustível, câmbio, opcionais, descrição)
+    # pro responder responder dúvidas factuais sem inventar nem desviar pro consultor.
+    focus_id: str | None = state.last_card_external_id
+    if not focus_id and state.veiculo_origem:
+        ids = state.veiculo_origem.matches_external_ids or []
+        if len(ids) == 1:
+            focus_id = ids[0]
+    if focus_id:
+        try:
+            v = await get_vehicle_details(focus_id)
+            if v:
+                out["focus_vehicle"] = {
+                    "external_id": v.get("external_id"),
+                    "titulo": v.get("titulo"),
+                    "marca": v.get("marca"),
+                    "modelo": v.get("modelo"),
+                    "versao": v.get("versao"),
+                    "ano": v.get("ano"),
+                    "preco": v.get("preco"),
+                    "quilometragem": v.get("quilometragem"),
+                    "combustivel": v.get("combustivel"),
+                    "cambio": v.get("cambio"),
+                    "cor": v.get("cor"),
+                    "portas": v.get("portas"),
+                    "opcionais": v.get("opcionais"),
+                    "descricao": v.get("descricao"),
+                }
+        except Exception as e:
+            log.error("focus_vehicle_fetch_failed", err=str(e))
     if update_intent_sec == "ver_outros_carros":
         try:
             # Query âncora: combina o foco atual (state.collected.veiculo_interesse)
