@@ -40,11 +40,27 @@ aceitou aquele veículo e podemos seguir qualificando o funil sem re-apresentar.
   lead engajar num veículo primeiro.
 
 # Após apresentação (vehicles_shown não-vazio)
-- Lead engaja num veículo apresentado ("gostei do 2019", "quero esse Montana",
-  "pode ser essa S10", "o primeiro tá bom"):
-  * `veiculo_interesse` = texto exato do veículo escolhido (ex: "Chevrolet S10 2008")
-  * `veiculo_interesse_confirmado=true`
-  * stage="descoberta", próximo missing é "nome" (PRIORITY).
+- Lead engaja num veículo apresentado — ENGAJAMENTO INCLUI RESPOSTAS ELÍPTICAS.
+  Quando você acabou de apresentar veículos e o lead responde de forma curta/elíptica
+  fazendo referência a UM deles, é CONFIRMAÇÃO DE FOCO. Exemplos REAIS de confirmação:
+    * Verbosa: "gostei do 2019", "quero esse Montana", "pode ser essa S10",
+      "o primeiro tá bom", "vou de Tracker", "fica com a HR-V mesmo"
+    * Elíptica (TÃO VÁLIDA QUANTO): "vamos nessa Tcross mesmo",
+      "vamos nessa", "isso aí", "isso", "esse mesmo", "essa", "esse",
+      "boa, esse", "tá bom esse", "pelo Tcross mesmo", "pelo HR-V mesmo",
+      "pode ser esse", "fechado nesse", "esse aí", "este aqui", "essa daí",
+      "vou nessa", "fico com esse", "esse serve"
+  AÇÃO em TODOS os casos acima (verboso ou elíptico):
+    * `veiculo_interesse` = texto/modelo correspondente do veículo apresentado
+      (deduza do vehicles_shown / contexto do turno anterior — ex: se você mostrou
+      Tracker / T-Cross / HR-V e lead disse "vamos nessa Tcross mesmo",
+      veiculo_interesse="VolksWagen T-Cross 2020" ou similar do shown).
+    * `veiculo_interesse_confirmado=true`  ← OBRIGATÓRIO
+    * stage="descoberta", próximo missing é "nome" (PRIORITY).
+- Quando o lead RECONFIRMA foco já estabelecido (você perguntou "decidiu pelo X?"
+  e lead respondeu "isso", "sim", "esse mesmo", "pelo X mesmo"):
+    * Mantenha `veiculo_interesse` atual.
+    * `veiculo_interesse_confirmado=true` (re-set explícito, sticky).
 - Lead pediu nova filtragem ("tem alguma SUV?", "tem outro?", "me mostra mais"):
   * `veiculo_interesse` = categoria/critério (ex: "SUV", "Honda")
   * `veiculo_interesse_confirmado=false`

@@ -112,13 +112,19 @@ def plan_next_question(
             canonical_text="", skip_funnel_reason="terminal",
         )
 
-    # 2. Dúvida operacional -> primeiro responde a dúvida, missing fica suspenso 1 turno
+    # 2. Dúvida operacional -> responde dúvida + RETOMA o funil no mesmo turno.
+    #    Se ainda há missing, devolve o próximo campo do funil como canonical.
+    #    Se funil completo mas falta agendamento, vai pro ramo agendamento abaixo.
     if update.intent_secundario == "duvida_operacional":
-        return NextQuestion(
-            field=None, intent="duvida",
-            canonical_text="",
-            skip_funnel_reason="responder dúvida do lead antes de avançar",
-        )
+        missing_now = compute_missing(state.collected)
+        if missing_now:
+            f0 = missing_now[0]
+            return NextQuestion(
+                field=f0, intent="funil",
+                canonical_text=CANONICAL_QUESTIONS.get(f0, ""),
+                skip_funnel_reason="responder dúvida + retomar funil",
+            )
+        # funil vazio mas pode ter agendamento pendente — cai pra próxima regra
 
     # 3. Apresentação em andamento (pre_bubbles foram preparados) ->
     #    pergunta de FOCO, não funil.
